@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   ensureLoggedIn, holdSecondFactor, secondFactorStatus, chooseSecondFactor,
   submitSecondFactorCode, cancelSecondFactor, refreshSession,
+  trustDeviceState, confirmTrustDevice,
 } from '../lib/refresh.mjs';
 
 const reply = (state) => ({ result: { result: { value: JSON.stringify(state) } } });
@@ -98,4 +99,26 @@ test('the code hint names the channel that was actually used', async () => {
   assert.equal(pending.stage, 'choose');
   assert.equal(pending.hint, '');
   await cancelSecondFactor();
+});
+
+test('the trusted-device prompt is recognised and answered', async () => {
+  // A correct code lands here instead of the console; 否 is pre-selected, so the
+  // plugin has to switch to 是 before pressing 确定.
+  const asking = { asking: true, radios: [{ value: '是', checked: false }, { value: '否', checked: true }], trust: '是' };
+  const seen = [];
+  const send = async (_, { expression }) => {
+    seen.push(expression);
+    if (expression.includes('body.innerText')) return reply(asking);
+    return reply({ found: true, checked: true, submitted: true });
+  };
+  const view = await trustDeviceState(send);
+  assert.equal(view.asking, true);
+  assert.equal(view.trust, '是');
+  assert.equal(await confirmTrustDevice(send), true);
+  assert.equal(seen.length, 2);
+});
+
+test('a trust prompt that will not select is reported instead of assumed', async () => {
+  const send = async () => reply({ found: true, checked: false });
+  assert.equal(await confirmTrustDevice(send), false);
 });
