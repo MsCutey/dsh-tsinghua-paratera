@@ -60,5 +60,5 @@ test('a valid replacement is active and its plist is private', (t) => {
   applyAgent(f);
   assert.equal(f.loaded(), true);
   assert.equal(fs.readFileSync(f.plistPath, 'utf8'), 'new-config');
-  assert.equal(fs.statSync(f.plistPath).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(f.plistPath).mode & 0o777, 0o600);
 });

@@ -11,19 +11,24 @@ import { readStoredCredentials, ensureLoggedIn, chromeProfileBusy } from '../lib
 import { makePlist } from '../scripts/setup-macos-task.mjs';
 import { parseArgs, findPnpm } from '../scripts/install.mjs';
 
+// path.join uses backslashes on Windows; normalize before comparing to POSIX fixtures.
+const posix = (value) => String(value).split(path.sep).join('/');
+
 test('Mac uses system/user Chrome apps and an isolated Application Support profile', () => {
   const value = platformPaths('darwin', '/Users/测试 User', { DSH_HOME: '/tmp/test dsh' });
-  assert.equal(value.sessionFile, '/tmp/test dsh/easycompute-session.json');
-  assert.equal(value.profileDir, '/Users/测试 User/Library/Application Support/DSH Paratera Balance/Chrome');
-  assert.ok(value.chromeCandidates.includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
-  assert.ok(value.chromeCandidates.includes('/Users/测试 User/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
+  // path.resolve() prefixes a drive on Windows, so only the suffix is host-independent.
+  assert.ok(posix(value.sessionFile).endsWith('/easycompute-session.json'));
+  assert.ok(posix(value.dshHome).endsWith('/test dsh'));
+  assert.equal(posix(value.profileDir), '/Users/测试 User/Library/Application Support/DSH Paratera Balance/Chrome');
+  assert.ok(value.chromeCandidates.map(posix).includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
+  assert.ok(value.chromeCandidates.map(posix).includes('/Users/测试 User/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(!value.chromeCandidates.some((file) => file.endsWith('.exe')));
 });
 
 test('Windows retains Chrome and LOCALAPPDATA profile locations', () => {
   const value = platformPaths('win32', '/home/test', { LOCALAPPDATA: '/custom-local' });
-  assert.equal(value.profileDir, '/custom-local/dsh-paratera-profile');
-  assert.ok(value.chromeCandidates.includes('/custom-local/Google/Chrome/Application/chrome.exe'));
+  assert.equal(posix(value.profileDir), '/custom-local/dsh-paratera-profile');
+  assert.ok(value.chromeCandidates.map(posix).includes('/custom-local/Google/Chrome/Application/chrome.exe'));
 });
 
 test('Mac credential lookup never invokes PowerShell and handles locked/missing items', async () => {
@@ -127,7 +132,7 @@ test('refresh lock excludes concurrent processes and state snapshots are private
       const release = acquireRefreshLock();
       if (!release || acquireRefreshLock() !== null) process.exit(1);
       writeState({lastError:'test-only'});
-      if ((fs.statSync(STATE_FILE).mode & 0o777) !== 0o600) process.exit(2);
+      if (process.platform !== 'win32' && (fs.statSync(STATE_FILE).mode & 0o777) !== 0o600) process.exit(2);
       release(); const again=acquireRefreshLock(); if (!again) process.exit(3); again();`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', code], { env: { ...process.env, DSH_HOME: folder }, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);

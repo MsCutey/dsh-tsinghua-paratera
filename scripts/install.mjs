@@ -150,7 +150,10 @@ async function main() {
 
   if (options.verify) {
     const state = inspect(profileDir);
-    const ok = state.linked && state.bundleListed && state.moduleLinked && state.target === PLUGIN_DIR;
+    const sameTarget = (() => {
+      try { return fs.realpathSync(state.target) === fs.realpathSync(PLUGIN_DIR); } catch { return false; }
+    })();
+    const ok = state.linked && state.bundleListed && state.moduleLinked && sameTarget;
     console.log(JSON.stringify({ ok, profileDir, ...state, hint: ok ? 'restart DSH to load the plugin' : 'run: node scripts/install.mjs' }, null, 2));
     process.exit(ok ? 0 : 1);
   }
