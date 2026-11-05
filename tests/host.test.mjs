@@ -38,6 +38,7 @@ function host(config = {}) {
 beforeEach(() => {
   calls = []
   rejection = null
+  mock.method(fs, 'mkdirSync', () => { throw new Error('ISOLATION: host tests must not start a browser or touch real state') })
   mock.method(fs, 'readFileSync', (file) => {
     if (file === SESSION_FILE) return JSON.stringify(session)
     if (file === STATE_FILE) return JSON.stringify({ snapshot: { couponFree: 976.93 }, lastRefreshAt: Date.now() })
@@ -67,6 +68,7 @@ test('balance reads only the official easycompute endpoint and reports coupon am
   assert.equal(calls[0].url, ORIGIN + '/auth/userInfo/query')
   assert.equal(calls[0].options.headers.token, 'fake-session-token')
   assert.ok(calls[0].options.signal instanceof AbortSignal)
+  assert.equal(calls[0].options.redirect, 'error')
 })
 
 test('unauthorized request neither fetches nor returns data', async () => {
@@ -76,6 +78,9 @@ test('unauthorized request neither fetches nor returns data', async () => {
   assert.equal(result.status, 401)
   assert.equal(result.body.ok, false)
   assert.equal(calls.length, 0)
+  for (const endpoint of ['credentials', 'login', 'refresh']) {
+    assert.equal((await h.request(endpoint, 'POST')).status, 401)
+  }
 })
 
 test('wrong methods are rejected without fetching', async () => {
@@ -98,7 +103,6 @@ test('status exposes the session lifetime and last snapshot', async () => {
 })
 
 test('an invalid payload never fabricates a zero balance', async () => {
-  mock.restoreAll()
   mock.method(fs, 'readFileSync', (file) => {
     if (file === SESSION_FILE) return JSON.stringify(session)
     if (file === STATE_FILE) return '{}'
@@ -110,6 +114,22 @@ test('an invalid payload never fabricates a zero balance', async () => {
   assert.equal(result.status, 200)
   assert.equal(result.body.ok, false)
   assert.notEqual(result.body.balance, 0)
+})
+
+test('an open login browser produces actionable instructions instead of chrome-not-ready', async () => {
+  mock.method(fs, 'mkdirSync', () => {})
+  mock.method(fs, 'openSync', () => 99999)
+  mock.method(fs, 'writeFileSync', () => {})
+  mock.method(fs, 'closeSync', () => {})
+  mock.method(fs, 'unlinkSync', () => {})
+  mock.method(fs, 'existsSync', () => true)
+  mock.method(fs, 'readlinkSync', () => `test-host-${process.pid}`)
+  mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 401 }))
+  const result = await host().request('balance')
+  assert.equal(result.status, 200)
+  assert.equal(result.body.reason, 'unavailable')
+  assert.match(result.body.error, /退出该专用 Chrome/)
+  assert.doesNotMatch(result.body.error, /chrome-not-ready/)
 })
 
 test('only the documented routes exist', async () => {

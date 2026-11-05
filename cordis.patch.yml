@@ -1,5 +1,5 @@
 # dsh-paratera-balance bundle patch
-# 余额取自清华算力平台用户信息接口；会话由专用浏览器 profile 自动维持，不保存密码。
+# 余额取自清华算力平台；专用浏览器会话续期，可选使用系统加密凭据存储。
 - insert:
     - id: paratera-balance
       name: dsh-paratera-balance

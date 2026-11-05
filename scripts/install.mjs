@@ -13,24 +13,31 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { buildCredentialHelper } from '../lib/macos-credentials.mjs';
 
 export const PACKAGE_NAME = 'dsh-paratera-balance';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = path.resolve(HERE, '..');
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--profile') options.profile = argv[++i];
-    else if (arg === '--dsh-home') options.dshHome = argv[++i];
+    if (arg === '--profile' || arg === '--dsh-home') {
+      const value = argv[++i];
+      if (!value || value.startsWith('-')) throw new Error('missing value for ' + arg);
+      if (arg === '--profile') {
+        if (!/^[\w-]+$/.test(value)) throw new Error('invalid profile name');
+        options.profile = value;
+      } else options.dshHome = path.resolve(value);
+    }
     else if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--verify') options.verify = true;
-    else if (arg === '--uninstall') { options.uninstall = true; options.install = false; }
+    else if (arg === '--uninstall') options.uninstall = true;
     else if (arg === '--no-install') options.install = false;
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
-    else if (arg.startsWith('-')) throw new Error('unknown option: ' + arg);
+    else throw new Error('unknown option: ' + arg);
   }
   return options;
 }
@@ -67,13 +74,18 @@ export function planManifest(manifest, pluginDir, { uninstall = false } = {}) {
   };
 }
 
-function findPnpm(nodeExecutable = process.execPath) {
+export function findPnpm(nodeExecutable = process.execPath) {
   const candidates = [];
   if (process.env.DSH_PNPM) candidates.push(process.env.DSH_PNPM);
   const nodeDir = path.dirname(nodeExecutable);
   candidates.push(path.resolve(nodeDir, '..', '..', 'pnpm', 'bin', 'pnpm.cjs'));
   candidates.push(path.resolve(nodeDir, '..', 'pnpm', 'bin', 'pnpm.cjs'));
   candidates.push(path.join(os.homedir(), '.dsh', 'dsh-runtimes', 'dsh-primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.cjs'));
+  if (process.platform === 'darwin') {
+    for (const apps of ['/Applications', path.join(os.homedir(), 'Applications')]) {
+      candidates.push(path.join(apps, 'DeepSeek Harness.app', 'Contents', 'Resources', 'runtime', 'primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.cjs'));
+    }
+  }
   for (const candidate of candidates) {
     if (candidate && fs.existsSync(candidate)) return { kind: 'script', path: candidate };
   }
@@ -82,10 +94,13 @@ function findPnpm(nodeExecutable = process.execPath) {
 
 function runPnpm(profileDir, pnpm, extraArgs = []) {
   const args = pnpm.kind === 'script'
-    ? [pnpm.path, 'install', '--dir', profileDir, ...extraArgs]
-    : ['install', '--dir', profileDir, ...extraArgs];
+    ? [pnpm.path, 'install', '--no-frozen-lockfile', '--dir', profileDir, ...extraArgs]
+    : ['install', '--no-frozen-lockfile', '--dir', profileDir, ...extraArgs];
   const executable = pnpm.kind === 'script' ? process.execPath : pnpm.path;
-  const result = spawnSync(executable, args, { encoding: 'utf8', timeout: 1000 * 60 * 10 });
+  const result = spawnSync(executable, args, {
+    encoding: 'utf8', timeout: 1000 * 60 * 10,
+    env: { ...process.env, PATH: path.dirname(process.execPath) + path.delimiter + (process.env.PATH || '') },
+  });
   return {
     ok: result.status === 0,
     status: result.status,
@@ -107,7 +122,7 @@ function inspect(profileDir) {
   return { manifestPath, linkEntry, linked, bundleListed, moduleLinked, target, moduleDir };
 }
 
-function main() {
+async function main() {
   let options;
   try {
     options = parseArgs(process.argv.slice(2));
@@ -119,6 +134,8 @@ function main() {
     console.log('node scripts/install.mjs [--profile desktop] [--dsh-home DIR] [--dry-run|--verify|--uninstall|--no-install]');
     return;
   }
+  if (!['darwin', 'win32'].includes(process.platform)) throw new Error('supported platforms: macOS and Windows');
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node 22+ required');
 
   const profileDir = path.join(options.dshHome, 'profiles', options.profile);
   const manifestPath = path.join(profileDir, 'package.json');
@@ -133,7 +150,7 @@ function main() {
 
   if (options.verify) {
     const state = inspect(profileDir);
-    const ok = state.linked && state.bundleListed && state.moduleLinked;
+    const ok = state.linked && state.bundleListed && state.moduleLinked && state.target === PLUGIN_DIR;
     console.log(JSON.stringify({ ok, profileDir, ...state, hint: ok ? 'restart DSH to load the plugin' : 'run: node scripts/install.mjs' }, null, 2));
     process.exit(ok ? 0 : 1);
   }
@@ -146,27 +163,41 @@ function main() {
     return;
   }
 
-  if (plan.changed) fs.writeFileSync(manifestPath, JSON.stringify(plan.manifest, null, 2) + '\n');
+  if (process.platform === 'darwin' && !options.uninstall) {
+    try { summary.credentialHelper = await buildCredentialHelper(); }
+    catch { throw new Error('keychain-helper-build-failed: install Xcode Command Line Tools (xcode-select --install)'); }
+  }
+  if (plan.changed) {
+    summary.backup = `${manifestPath}.balance-backup-${Date.now()}`;
+    fs.copyFileSync(manifestPath, summary.backup);
+    fs.chmodSync(summary.backup, 0o600);
+    fs.writeFileSync(manifestPath, JSON.stringify(plan.manifest, null, 2) + '\n');
+  }
 
   if (options.install) {
     const pnpm = findPnpm();
     summary.pnpm = pnpm.kind === 'script' ? pnpm.path : 'pnpm (PATH)';
     const install = runPnpm(profileDir, pnpm);
-    summary.install = { ok: install.ok, status: install.status, tail: install.ok ? install.stdout : install.stderr };
+    summary.install = { ok: install.ok, status: install.status, tail: install.ok ? install.stdout : (install.stderr || install.stdout) };
     if (!install.ok) {
+      if (summary.backup) fs.copyFileSync(summary.backup, manifestPath);
       console.log(JSON.stringify({ ...summary, ok: false, error: 'pnpm-failed', hint: 'install pnpm or pass DSH_PNPM=<path to pnpm.cjs>' }, null, 2));
       process.exit(1);
     }
   }
 
   const state = inspect(profileDir);
-  summary.ok = options.uninstall ? !state.bundleListed : state.linked && state.bundleListed;
+  summary.ok = options.uninstall ? !state.bundleListed && !state.linked : state.linked && state.bundleListed && state.moduleLinked;
   summary.state = { linked: state.linked, bundleListed: state.bundleListed, moduleLinked: state.moduleLinked };
   summary.next = options.uninstall
     ? ['restart DSH']
-    : ['restart DSH', 'settings -> 清华算力余额 -> 保存凭据', 'optional: powershell -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1'];
+    : ['restart DSH', 'settings -> 清华算力余额 -> 保存凭据', process.platform === 'darwin'
+      ? 'optional: node scripts/setup-macos-task.mjs'
+      : 'optional: powershell -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1'];
   console.log(JSON.stringify(summary, null, 2));
   process.exit(summary.ok ? 0 : 1);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  main().catch((error) => { console.log(JSON.stringify({ ok: false, error: error.message })); process.exitCode = 1; });
+}

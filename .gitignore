@@ -3,6 +3,7 @@ audit/
 *.log
 *.tgz
 .artifacts/
+.local/
 .DS_Store
 Thumbs.db
 .env
