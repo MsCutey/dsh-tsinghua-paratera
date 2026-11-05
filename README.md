@@ -132,7 +132,16 @@ git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git "%USERPROFI
 node "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance\scripts\install.mjs"
 ```
 
-脚本会自动改 profile 清单、跑 pnpm、校验链接，并在结尾输出 JSON 摘要；重复执行安全。
+脚本会按**当前设备的系统**自动选择实现，并在结尾输出 JSON 摘要；重复执行安全：
+
+| 平台 | 凭据存储 | 后台续期 |
+| --- | --- | --- |
+| Windows 10/11 | DPAPI（`~/.dsh/easycompute-credentials.bin`） | 计划任务 `DSH Tsinghua Balance Refresh` |
+| macOS 13+ | Keychain（Swift 助手，需 Xcode Command Line Tools） | launchd agent |
+| 其他 | 不支持，安装器会直接报 `unsupported-platform` | — |
+
+后台任务默认随安装注册；不想注册用 `--no-task`。
+
 校验：
 
 ```text
@@ -155,10 +164,8 @@ node scripts\install.mjs --verify   # 期望 "ok": true
    然后在 profile 目录执行 `pnpm install`（用 DSH 自带的 pnpm）。
 3. 完全退出并重启 DSH，设置里应出现「清华算力余额」页签。
 4. 点「保存凭据」，输入一次账号密码（DPAPI 加密保存在本机）。
-5. 注册后台续期任务（可选，DSH 关闭时也生效）：
-   ```text
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup-windows-task.ps1
-   ```
+5. 后台续期任务由安装器按系统自动注册（Windows 计划任务 / macOS launchd），无需手动执行。
+   如需跳过：`node scripts\install.mjs --no-task`。
 6. 自检：
    ```text
    node lib\scheduled.mjs

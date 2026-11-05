@@ -14,13 +14,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildCredentialHelper } from '../lib/macos-credentials.mjs';
+import { resolveInstallPlan } from '../lib/platform.mjs';
 
 export const PACKAGE_NAME = 'dsh-paratera-balance';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = path.resolve(HERE, '..');
 
 export function parseArgs(argv) {
-  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, json: false };
+  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, task: true, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--profile' || arg === '--dsh-home') {
@@ -35,6 +36,8 @@ export function parseArgs(argv) {
     else if (arg === '--verify') options.verify = true;
     else if (arg === '--uninstall') options.uninstall = true;
     else if (arg === '--no-install') options.install = false;
+    else if (arg === '--task') options.task = true;
+    else if (arg === '--no-task') options.task = false;
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else throw new Error('unknown option: ' + arg);
@@ -131,15 +134,21 @@ async function main() {
     process.exit(1);
   }
   if (options.help) {
-    console.log('node scripts/install.mjs [--profile desktop] [--dsh-home DIR] [--dry-run|--verify|--uninstall|--no-install]');
+    console.log('node scripts/install.mjs [--profile desktop] [--dsh-home DIR] [--dry-run|--verify|--uninstall|--no-install|--task|--no-task]');
     return;
   }
   if (!['darwin', 'win32'].includes(process.platform)) throw new Error('supported platforms: macOS and Windows');
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node 22+ required');
 
+  const platformPlan = resolveInstallPlan(process.platform);
+  if (!platformPlan.supported) {
+    console.log(JSON.stringify({ ok: false, error: platformPlan.reason, platform: process.platform, hint: 'supported platforms: Windows 11/10, macOS 13+' }, null, 2));
+    process.exit(1);
+  }
+
   const profileDir = path.join(options.dshHome, 'profiles', options.profile);
   const manifestPath = path.join(profileDir, 'package.json');
-  const summary = { ok: false, pluginDir: PLUGIN_DIR, profile: options.profile, profileDir, dryRun: options.dryRun };
+  const summary = { ok: false, pluginDir: PLUGIN_DIR, platform: process.platform, profile: options.profile, profileDir, dryRun: options.dryRun };
 
   if (!fs.existsSync(manifestPath)) {
     console.log(JSON.stringify({ ...summary, error: 'profile-not-found', hint: `no manifest at ${manifestPath}` }, null, 2));
@@ -189,14 +198,32 @@ async function main() {
     }
   }
 
+  if (options.task && !options.uninstall && platformPlan.task) {
+    const scriptPath = path.join(PLUGIN_DIR, platformPlan.task.script);
+    const execution = platformPlan.task.kind === 'powershell'
+      ? { file: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PluginDir', PLUGIN_DIR] }
+      : { file: process.execPath, args: [scriptPath] };
+    summary.task = { kind: platformPlan.task.kind, script: path.basename(scriptPath) };
+    if (!fs.existsSync(scriptPath)) {
+      summary.task.ok = false;
+      summary.task.error = 'task-script-missing';
+    } else {
+      const run = spawnSync(execution.file, execution.args, { encoding: 'utf8', timeout: 1000 * 120 });
+      summary.task.ok = run.status === 0;
+      summary.task.tail = (run.status === 0 ? run.stdout : run.stderr || run.stdout || '').trim().split(String.fromCharCode(10)).slice(-6).join(String.fromCharCode(10));
+    }
+  }
+
   const state = inspect(profileDir);
   summary.ok = options.uninstall ? !state.bundleListed && !state.linked : state.linked && state.bundleListed && state.moduleLinked;
   summary.state = { linked: state.linked, bundleListed: state.bundleListed, moduleLinked: state.moduleLinked };
   summary.next = options.uninstall
     ? ['restart DSH']
-    : ['restart DSH', 'settings -> 清华算力余额 -> 保存凭据', process.platform === 'darwin'
-      ? 'optional: node scripts/setup-macos-task.mjs'
-      : 'optional: powershell -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1'];
+    : [
+      'restart DSH',
+      'settings -> 清华算力余额 -> 保存凭据',
+      summary.task?.ok === false ? 'background task failed; rerun with --task or see the error above' : null,
+    ].filter(Boolean);
   console.log(JSON.stringify(summary, null, 2));
   process.exit(summary.ok ? 0 : 1);
 }

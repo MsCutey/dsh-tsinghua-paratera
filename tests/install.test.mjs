@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { planManifest, PACKAGE_NAME } from '../scripts/install.mjs'
+import { resolveInstallPlan } from '../lib/platform.mjs'
 
 const PLUGIN = 'F:\\Vibe Coding\\插件开发\\dsh-paratera-balance'
 
@@ -40,4 +41,25 @@ test('does not mutate the input manifest', () => {
   const input = { dependencies: {}, dsh: { profile: { bundles: [] } } }
   planManifest(input, PLUGIN)
   assert.deepEqual(input, { dependencies: {}, dsh: { profile: { bundles: [] } } })
+})
+
+
+test('platform plan selects the native task mechanism', () => {
+  assert.deepEqual(resolveInstallPlan('win32'), {
+    supported: true,
+    task: { kind: 'powershell', script: 'scripts/setup-windows-task.ps1' },
+    credentialHelper: 'dpapi',
+  })
+  assert.deepEqual(resolveInstallPlan('darwin'), {
+    supported: true,
+    task: { kind: 'node', script: 'scripts/setup-macos-task.mjs' },
+    credentialHelper: 'keychain',
+  })
+})
+
+test('unsupported platforms fail loudly instead of installing partially', () => {
+  const plan = resolveInstallPlan('linux')
+  assert.equal(plan.supported, false)
+  assert.equal(plan.reason, 'unsupported-platform')
+  assert.equal(plan.task, null)
 })

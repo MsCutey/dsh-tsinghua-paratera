@@ -44,11 +44,14 @@ node <插件目录>\scripts\install.mjs
 
 脚本做的事（不要手工重复）：
 
-1. 在 `%USERPROFILE%\.dsh\profiles\desktop\package.json` 的 `dependencies` 写入
-   `"dsh-paratera-balance": "link:<插件绝对路径>"`（幂等）
+1. 在 profile 的 `package.json` 写入 `"dsh-paratera-balance": "link:<插件绝对路径>"`（幂等）
 2. 在 `dsh.profile.bundles` 追加 `"dsh-paratera-balance"`（幂等）
 3. 用 DSH 自带的 pnpm 执行 `pnpm install --dir <profile>`
-4. 输出 JSON 摘要
+4. **按系统自动注册后台续期**：Windows 用计划任务，macOS 用 launchd；
+   macOS 上还会编译 Keychain 助手（需要 `xcode-select --install`）
+5. 输出 JSON 摘要（含 `platform`、`task.ok`、`state`）
+
+不想注册后台任务时加 `--no-task`。
 
 ## 成功判据（必须逐条核对）
 
