@@ -2,9 +2,10 @@
 
 日期：2026-11-05（Asia/Shanghai）。源码基于 GitLab `main` 的下载快照，页面所示提交
 `fbac4f16ba5b7f3eed3fe2a0491169c320c3e92f`，原 package 版本 `0.4.2`。
-本地分支为 `macos-support`，已通过用户确认的项目专用只读 Deploy Key 拉取 Git 历史，
+本地分支为 `macos-support`，已通过用户确认的项目专用 Deploy Key 拉取 Git 历史，
 基线确认为上述提交。Mac 开发分支基于该基线维护。
-公钥有效期至 2027-11-05；私钥只保存在本机被忽略的 `.local/gitlab-auth/`，Git 配置仅作用于本仓库。
+用户已授权这台设备保留本项目的读写权限，用于后续普通分支维护；原有 `main` 分支保护保持有效。
+密钥有效期至 2027-11-05；私钥只保存在本机被忽略的 `.local/gitlab-auth/`，Git 配置仅作用于本仓库。
 
 ## 已验证
 
