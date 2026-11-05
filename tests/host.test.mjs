@@ -142,6 +142,7 @@ test('only the documented routes exist', async () => {
     '/paratera-balance/api/keys',
     '/paratera-balance/api/keys/create',
     '/paratera-balance/api/keys/delete',
+    '/paratera-balance/api/keys/import',
     '/paratera-balance/api/keys/refresh-models',
     '/paratera-balance/api/keys/update',
     '/paratera-balance/api/login',
