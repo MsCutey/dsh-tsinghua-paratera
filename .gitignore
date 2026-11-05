@@ -2,6 +2,7 @@ node_modules/
 audit/
 *.log
 *.tgz
+.artifacts/
 .DS_Store
 Thumbs.db
 .env

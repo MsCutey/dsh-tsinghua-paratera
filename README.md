@@ -62,6 +62,41 @@ config:
   cacheMs: 5000   # 余额缓存毫秒数，上限 60000
 ```
 
+## 在另一台设备安装（Windows）
+
+前置：Windows 10/11、已安装 Chrome、Node 22+（DSH 自带即可）、DSH 0.2.1-rc.5 及以上。
+
+1. 克隆到任意目录（路径含空格也没问题）：
+   ```text
+   git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git
+   ```
+2. 作为本地链接装进 DSH profile，编辑 `%USERPROFILE%\.dsh\profiles\desktop\package.json`：
+   - `dependencies` 增加 `"dsh-paratera-balance": "link:<克隆路径>"`
+   - `dsh.profile.bundles` 追加 `"dsh-paratera-balance"`
+   然后在 profile 目录执行 `pnpm install`（用 DSH 自带的 pnpm）。
+3. 完全退出并重启 DSH，设置里应出现「清华算力余额」页签。
+4. 点「保存凭据」，输入一次账号密码（DPAPI 加密保存在本机）。
+5. 注册后台续期任务（可选，DSH 关闭时也生效）：
+   ```text
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup-windows-task.ps1
+   ```
+6. 自检：
+   ```text
+   node lib\scheduled.mjs
+   ```
+   期望输出 `{"ok":true,...}` 并写入 `~/.dsh/easycompute-session.json`。
+
+## 目录结构
+
+```text
+lib/index.js      宿主插件：路由、余额映射、后台检查
+lib/refresh.mjs   会话刷新、静默登录、DPAPI 凭据读取、浏览器控制
+lib/client.js     客户端：输入栏小标 + 设置页
+lib/scheduled.mjs 计划任务入口
+scripts/          凭据对话框、解密脚本、计划任务安装
+tests/            隔离测试（网络/浏览器/凭据全 mock）
+```
+
 ## 开发
 
 ```text
