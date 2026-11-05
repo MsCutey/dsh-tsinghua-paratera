@@ -139,6 +139,7 @@ test('only the documented routes exist', async () => {
     '/paratera-balance/api/console/connect',
     '/paratera-balance/api/console/status',
     '/paratera-balance/api/credentials',
+    '/paratera-balance/api/credentials/status',
     '/paratera-balance/api/keys',
     '/paratera-balance/api/keys/create',
     '/paratera-balance/api/keys/delete',
