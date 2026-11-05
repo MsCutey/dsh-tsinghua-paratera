@@ -1,0 +1,11 @@
+node_modules/
+audit/
+*.log
+*.tgz
+.DS_Store
+Thumbs.db
+.env
+.env.*
+.credentials*
+paratera-token.json
+easycompute-session.json
