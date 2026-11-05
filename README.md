@@ -62,6 +62,22 @@ config:
   cacheMs: 5000   # 余额缓存毫秒数，上限 60000
 ```
 
+## 一句话安装（人类或 AI）
+
+```text
+git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance"
+node "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance\scripts\install.mjs"
+```
+
+脚本会自动改 profile 清单、跑 pnpm、校验链接，并在结尾输出 JSON 摘要；重复执行安全。
+校验：
+
+```text
+node scripts\install.mjs --verify   # 期望 "ok": true
+```
+
+给 AI 代理的完整协议见 [AGENTS.md](AGENTS.md)（含前置检查、成功判据、失败处理、凭据边界）。
+
 ## 在另一台设备安装（Windows）
 
 前置：Windows 10/11、已安装 Chrome、Node 22+（DSH 自带即可）、DSH 0.2.1-rc.5 及以上。

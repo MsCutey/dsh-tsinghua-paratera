@@ -1,8 +1,11 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "scripts": {
-    "test": "node --test --test-force-exit tests/client.test.mjs tests/host.test.mjs"
+    "test": "node --test --test-force-exit tests/client.test.mjs tests/host.test.mjs tests/install.test.mjs",
+    "install:dsh": "node scripts/install.mjs",
+    "verify:dsh": "node scripts/install.mjs --verify",
+    "task:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1"
   },
   "private": true,
   "description": "DSH 原生模型栏余额插件：读取清华算力平台算力券余额，专用浏览器会话自动续期，设置页可刷新与重新登录",
@@ -17,7 +20,8 @@
     "lib",
     "scripts",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "AGENTS.md"
   ],
   "dsh": {
     "bundle": {
