@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ensureLoggedIn, holdSecondFactor, secondFactorStatus, chooseSecondFactor,
-  submitSecondFactorCode, cancelSecondFactor,
+  submitSecondFactorCode, cancelSecondFactor, refreshSession,
 } from '../lib/refresh.mjs';
 
 const reply = (state) => ({ result: { result: { value: JSON.stringify(state) } } });
@@ -63,4 +63,12 @@ test('unknown methods and malformed codes are rejected before touching the page'
 test('choosing or submitting without a parked session is reported, not thrown', async () => {
   assert.deepEqual(await chooseSecondFactor('mobile'), { ok: false, error: 'no-second-factor' });
   assert.deepEqual(await submitSecondFactorCode('123456'), { ok: false, error: 'no-second-factor' });
+});
+
+test('a parked session blocks a competing refresh instead of driving the same browser', async () => {
+  const opened = { send: async () => reply(secondFactorView) };
+  await holdSecondFactor(opened);
+  // Even an explicit refresh must wait: the parked browser owns the SSO state.
+  assert.deepEqual(await refreshSession({ force: true }), { ok: false, error: 'second-factor-pending' });
+  await cancelSecondFactor();
 });
