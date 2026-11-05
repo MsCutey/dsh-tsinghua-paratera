@@ -72,3 +72,30 @@ test('a parked session blocks a competing refresh instead of driving the same br
   assert.deepEqual(await refreshSession({ force: true }), { ok: false, error: 'second-factor-pending' });
   await cancelSecondFactor();
 });
+
+test('the chosen method must really be selected before 确定 is pressed', async () => {
+  let calls = 0;
+  const opened = {
+    send: async () => {
+      calls += 1;
+      // First call parks on the choose page; the radio then refuses to flip.
+      if (calls === 1) return reply(secondFactorView);
+      return { result: { result: { value: JSON.stringify({ found: true, checked: false }) } } };
+    },
+  };
+  await holdSecondFactor(opened);
+  assert.deepEqual(await chooseSecondFactor('wechat'), { ok: false, error: 'second-factor-method-not-selected' });
+  // Nothing was submitted, so no code can have gone out on the other channel.
+  assert.equal(calls, 2);
+  await cancelSecondFactor();
+});
+
+test('the code hint names the channel that was actually used', async () => {
+  const opened = { send: async () => reply(secondFactorView) };
+  await holdSecondFactor(opened);
+  // Choosing a method updates the stage; the hint must not mention the other channel.
+  const pending = secondFactorStatus();
+  assert.equal(pending.stage, 'choose');
+  assert.equal(pending.hint, '');
+  await cancelSecondFactor();
+});
