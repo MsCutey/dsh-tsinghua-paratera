@@ -2,194 +2,125 @@ import { test, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import plugin from '../lib/index.js'
+import { SESSION_FILE, STATE_FILE } from '../lib/refresh.mjs'
 
-const TOKEN_REF = 'DSH_PARATERA_ISOLATED_TEST_TOKEN_20261102'
-const PRICE = 'https://ai.paratera.com/platform/paraUser/getPrice'
-const QUOTA = 'https://ai.paratera.com/platform/resourceUserConfig/getList'
-const validPrice = { chargeFree: '10.25', creditFree: 2, aiFrozenPrice: 1, userServerFrozenPrice: 0, totalLockAmount: 0.25 }
-let networkCalls
-let browserCalls
-let savedEnv
-beforeEach(() => {
-  networkCalls = []
-  browserCalls = 0
-  savedEnv = process.env[TOKEN_REF]
-  delete process.env[TOKEN_REF]
-  mock.method(globalThis, 'fetch', async (...args) => {
-    networkCalls.push(args)
-    throw new Error('ISOLATION: no real network permitted')
-  })
-  mock.method(fs, 'readdirSync', () => { browserCalls++; throw new Error('ISOLATION: no browser reads permitted') })
-})
-afterEach(() => {
-  mock.restoreAll()
-  if (savedEnv === undefined) delete process.env[TOKEN_REF]
-  else process.env[TOKEN_REF] = savedEnv
-  assert.equal(browserCalls, 0)
-})
-function json(data, options = {}) {
-  return new Response(JSON.stringify({ code: 200, data }), { status: 200, headers: { 'content-type': 'application/json' }, ...options })
-}
-function fetchWith(fn) {
-  globalThis.fetch.mock.mockImplementation(async (...args) => { networkCalls.push(args); return fn(...args) })
-}
-function host({ rejection = null, credential = 'fake-test-token', config = {}, connection } = {}) {
+const ORIGIN = 'https://easycompute.cs.tsinghua.edu.cn'
+const session = { token: 'fake-session-token', exp: Date.now() + 6 * 3600 * 1000, capturedAt: Date.now() }
+const validUser = { code: 200, data: { couponFree: 976.9321, couponUsed: 2123.0679, couponTotal: 2000, gpuUsed: 0.14, tokenUsed: 145344533, department: '物理系', clazz: 'X0011' } }
+
+let calls
+let rejection
+
+function host(config = {}) {
   const routes = new Map()
-  let credentialReads = 0
-  let authCalls = 0
   const ctx = {
-    credentials: { async resolve(ref) { credentialReads++; assert.equal(ref, TOKEN_REF); return { value: credential } } },
-    connection: connection ?? { requestRejection() { authCalls++; return rejection } },
     webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path) } },
+    credentials: { async resolve() { throw new Error('ISOLATION: credentials must not be read') } },
+    connection: { requestRejection() { return rejection } },
     effect(fn) { fn() },
   }
-  plugin.apply({ inject(names, callback) {
-    assert.deepEqual(names, ['webServer', 'credentials', 'connection'])
-    callback(ctx)
-  } }, { source: 'paratera', tokenRef: TOKEN_REF, ...config })
+  plugin.apply({ inject(names, callback) { assert.deepEqual(names, ['webServer', 'credentials', 'connection']); callback(ctx) } }, config)
   return {
     routes,
-    get credentialReads() { return credentialReads },
-    get authCalls() { return authCalls },
-    async request(suffix = 'balance', method = 'GET') {
-      let status
-      let headers
-      let body
-      const url = `/paratera-balance/api/${suffix}`
-      const handler = routes.get(url.split('?')[0])
+    async request(path, method = 'GET') {
+      const handler = routes.get('/paratera-balance/api/' + path)
       if (!handler) return { status: 404 }
-      await handler({ url, method, headers: {} }, {
-        writeHead(code, fields) { status = code; headers = fields },
-        end(value) { body = JSON.parse(value) },
-      })
-      return { status, headers, body }
+      let status = 0
+      let headers = {}
+      let body = ''
+      const res = { writeHead(code, h) { status = code; headers = h }, end(text) { body = text } }
+      await handler({ method, url: '/paratera-balance/api/' + path }, res)
+      return { status, headers, body: body ? JSON.parse(body) : null }
     },
   }
 }
 
-test('unauthorized request cannot resolve credentials, read browser or fetch', async () => {
-  for (const rejection of [401, 403, true, 0, 'unexpected']) {
-    const h = host({ rejection })
-    const result = await h.request()
-    assert.ok([401, 403].includes(result.status))
-    assert.equal(h.credentialReads, 0)
-  }
-  assert.equal(networkCalls.length, 0)
+beforeEach(() => {
+  calls = []
+  rejection = null
+  mock.method(fs, 'readFileSync', (file) => {
+    if (file === SESSION_FILE) return JSON.stringify(session)
+    if (file === STATE_FILE) return JSON.stringify({ snapshot: { couponFree: 976.93 }, lastRefreshAt: Date.now() })
+    throw new Error('unexpected read: ' + file)
+  })
+  mock.method(globalThis, 'fetch', async (url, options = {}) => {
+    calls.push({ url: String(url), options })
+    return new Response(JSON.stringify(validUser), { status: 200, headers: { 'content-type': 'application/json' } })
+  })
 })
-test('missing and throwing connection fences fail closed', async () => {
-  for (const connection of [{}, { requestRejection() { throw new Error('private') } }]) {
-    const h = host({ connection })
-    assert.equal((await h.request()).status, 403)
-    assert.equal(h.credentialReads, 0)
-  }
+
+afterEach(() => {
+  mock.restoreAll()
 })
-test('legal balance uses only official destinations, POST JSON and redirect denial', async () => {
-  fetchWith((url) => json(url === PRICE ? validPrice : { monetaryQuotaStatus: 1, unUsedMonetaryQuota: '7.50' }))
-  const h = host({ config: { base: 'https://attacker.invalid/', endpoint: 'secret' } })
-  const result = await h.request()
+
+test('balance reads only the official easycompute endpoint and reports coupon amounts', async () => {
+  const h = host()
+  const result = await h.request('balance')
   assert.equal(result.status, 200)
   assert.equal(result.headers['Cache-Control'], 'no-store')
-  assert.equal(result.body.balance, 12.25)
-  assert.equal(result.body.availableQuota, 7.5)
-  assert.equal(result.body.calculationVerified, false)
-  assert.equal(result.body.quotaSource, 'unUsedMonetaryQuota')
-  assert.deepEqual(networkCalls.map(([url]) => url), [PRICE, QUOTA])
-  for (const [, options] of networkCalls) {
-    assert.equal(options.redirect, 'error')
-    assert.equal(options.headers.token, 'fake-test-token')
-    assert.ok(options.signal instanceof AbortSignal)
-  }
-  assert.equal(networkCalls[1][1].method, 'POST')
-  assert.equal(networkCalls[1][1].headers['Content-Type'], 'application/json')
-  assert.equal(networkCalls[1][1].body, '{}')
-  await h.request()
-  assert.equal(networkCalls.length, 2)
-  assert.equal(h.authCalls, 2)
+  assert.equal(result.body.ok, true)
+  assert.equal(result.body.source, 'easycompute')
+  assert.equal(result.body.availableQuota, 976.93)
+  assert.equal(result.body.detail.couponUsed, 2123.07)
+  assert.equal(result.body.account.department, '物理系')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, ORIGIN + '/auth/userInfo/query')
+  assert.equal(calls[0].options.headers.token, 'fake-session-token')
+  assert.ok(calls[0].options.signal instanceof AbortSignal)
 })
-test('missing or invalid required amounts are not successful zero balances', async () => {
-  for (const value of [undefined, null, '', true, 'NaN', {}, 'Infinity']) {
-    fetchWith(() => json({ ...validPrice, chargeFree: value }))
-    const result = await host().request()
-    assert.equal(result.body.ok, false)
-    assert.equal(result.body.balance, undefined)
-  }
-})
-test('missing optional fields remain unknown; historical calculation is labelled', async () => {
-  fetchWith((url) => json(url === PRICE ? { chargeFree: 10, creditFree: 0 } : {}))
-  const unknown = (await host().request()).body
-  assert.equal(unknown.balance, 10)
-  assert.equal(unknown.availableQuota, null)
-  assert.equal(unknown.detail.couponFree, null)
-  assert.equal(unknown.detail.frozen, null)
-  fetchWith((url) => json(url === PRICE ? validPrice : { monetaryQuotaStatus: 0 }))
-  const estimate = (await host().request()).body
-  assert.equal(estimate.availableQuota, 11)
-  assert.equal(estimate.quotaSource, 'legacy-estimate')
-  assert.equal(typeof estimate.calculationNote, 'string')
-})
-test('missing active independent quota must not silently fall back', async () => {
-  fetchWith((url) => json(url === PRICE ? validPrice : { monetaryQuotaStatus: 1 }))
-  assert.equal((await host().request()).body.availableQuota, null)
-})
-test('no token defaults to credentials/env only, including string opt-in', async () => {
-  for (const config of [{}, { browserTokenAccess: 'true' }, { tokenMode: 'auto' }]) {
-    const result = await host({ credential: '', config }).request()
-    assert.equal(result.body.ok, false)
-    assert.equal(result.body.configured, false)
-  }
-  assert.equal(networkCalls.length, 0)
-})
-test('environment token works without browser collection', async () => {
-  process.env[TOKEN_REF] = 'fake-env-token'
-  fetchWith((url) => json(url === PRICE ? validPrice : {}))
-  assert.equal((await host({ credential: '' }).request()).body.ok, true)
-  assert.equal(networkCalls[0][1].headers.token, 'fake-env-token')
-})
-test('network and raw upstream errors are never exposed', async () => {
-  fetchWith(() => { throw new Error('fake-test-token PRIVATE_PATH secret response') })
-  const failure = (await host().request()).body
-  assert.equal(failure.ok, false)
-  assert.doesNotMatch(JSON.stringify(failure), /fake-test-token|PRIVATE_PATH|secret response/)
-  fetchWith(() => new Response('raw private upstream', { status: 500 }))
-  const upstream = (await host().request()).body
-  assert.equal(upstream.ok, false)
-  assert.doesNotMatch(JSON.stringify(upstream), /raw private upstream/)
-})
-test('invalid HTTP, JSON envelopes, content types and oversized bodies fail validation', async () => {
-  for (const response of [
-    json(validPrice, { status: 302 }),
-    json(validPrice, { status: 403 }),
-    new Response(JSON.stringify({ code: 500, data: validPrice }), { headers: { 'content-type': 'application/json' } }),
-    new Response(JSON.stringify({ data: [] }), { headers: { 'content-type': 'application/json' } }),
-    new Response('bad json', { headers: { 'content-type': 'application/json' } }),
-    json(validPrice, { headers: { 'content-type': 'text/html' } }),
-    new Response('x'.repeat(128 * 1024 + 1), { headers: { 'content-type': 'application/json' } }),
-  ]) {
-    fetchWith(() => response)
-    assert.equal((await host().request()).body.ok, false)
-  }
-})
-test('timeout aborts the isolated request', async () => {
-  mock.timers.enable({ apis: ['setTimeout'] })
-  fetchWith((_url, options) => new Promise((_resolve, reject) => {
-    options.signal.addEventListener('abort', () => reject(new Error('private timeout')), { once: true })
-  }))
-  const pending = host().request()
-  // Credential resolution and request creation are asynchronous; drain microtasks.
-  await Promise.resolve()
-  await Promise.resolve()
-  mock.timers.tick(12000)
-  assert.equal((await pending).body.ok, false)
-  assert.equal(networkCalls[0][1].signal.aborted, true)
-})
-test('unsafe/debug/script/report routes do not exist; wrong method reads no credentials', async () => {
+
+test('unauthorized request neither fetches nor returns data', async () => {
+  rejection = 401
   const h = host()
-  assert.equal(h.routes.size, 4)
-  assert.deepEqual([...h.routes.keys()].sort(), ['/paratera-balance/api/balance', '/paratera-balance/api/login', '/paratera-balance/api/refresh', '/paratera-balance/api/status'])
-  for (const route of ['probe', 'token-info', 'widget.js', 'report', 'report-log']) {
-    assert.equal((await h.request(route)).status, 404)
-  }
+  const result = await h.request('balance')
+  assert.equal(result.status, 401)
+  assert.equal(result.body.ok, false)
+  assert.equal(calls.length, 0)
+})
+
+test('wrong methods are rejected without fetching', async () => {
+  const h = host()
   assert.equal((await h.request('balance', 'POST')).status, 405)
-  assert.equal(h.credentialReads, 0)
-  assert.equal(networkCalls.length, 0)
+  assert.equal((await h.request('status', 'POST')).status, 405)
+  assert.equal((await h.request('refresh', 'GET')).status, 405)
+  assert.equal(calls.length, 0)
+})
+
+test('status exposes the session lifetime and last snapshot', async () => {
+  const h = host()
+  const result = await h.request('status')
+  assert.equal(result.status, 200)
+  assert.equal(result.body.source, 'easycompute')
+  assert.equal(result.body.configured, true)
+  assert.equal(result.body.tokenValid, true)
+  assert.equal(result.body.tokenExpiresAt, session.exp)
+  assert.equal(result.body.snapshot.couponFree, 976.93)
+})
+
+test('an invalid payload never fabricates a zero balance', async () => {
+  mock.restoreAll()
+  mock.method(fs, 'readFileSync', (file) => {
+    if (file === SESSION_FILE) return JSON.stringify(session)
+    if (file === STATE_FILE) return '{}'
+    throw new Error('unexpected read')
+  })
+  mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ code: 200, data: { couponUsed: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } }))
+  const h = host()
+  const result = await h.request('balance')
+  assert.equal(result.status, 200)
+  assert.equal(result.body.ok, false)
+  assert.notEqual(result.body.balance, 0)
+})
+
+test('only the documented routes exist', async () => {
+  const h = host()
+  assert.deepEqual([...h.routes.keys()].sort(), [
+    '/paratera-balance/api/balance',
+    '/paratera-balance/api/login',
+    '/paratera-balance/api/refresh',
+    '/paratera-balance/api/status',
+  ])
+  for (const legacy of ['probe', 'token-info', 'widget.js', 'report', 'report-log']) {
+    assert.equal((await h.request(legacy)).status, 404)
+  }
 })

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
 
 function fixture(provider = 'paratera') {
-  let entry, registration, effect, deps, state = null, cleanup
+  let entry, registration, settingsRegistration, effect, deps, state = null, cleanup
   const snapshot = { current: { provider, model: 'test-model' } }
   const requests = [], intervals = new Map(), listeners = new Map()
   const document = { visibilityState: 'visible', addEventListener: (k,v) => listeners.set(k,v), removeEventListener: k => listeners.delete(k) }
@@ -26,10 +26,17 @@ function fixture(provider = 'paratera') {
   const stores = new Map()
   plugin.apply({
     get: name => name === 'modelDirectories' ? { directoryFor: id => { stores.set(id,true); return { store: { subscribe:()=>()=>{},getSnapshot:()=>snapshot } } } } : undefined,
-    slots: { inject: (name, fn) => { assert.equal(name,'conversation.input.right'); return fn() }, register: (spec, component) => { registration={spec,component}; return ()=>{} } },
+    slots: {
+      inject: (name, fn) => { assert.ok(['conversation.input.right','settings.section'].includes(name)); return fn() },
+      register: (spec, component) => {
+        if (spec.name === 'conversation.input.right') registration = { spec, component }
+        else settingsRegistration = { spec, component }
+        return () => {}
+      },
+    },
   })
   const props = registration.spec.inject('session-a')
-  return { registration, snapshot, requests, document, intervals, listeners, stores,
+  return { registration, settingsRegistration, snapshot, requests, document, intervals, listeners, stores,
     render: () => registration.component(props),
     runEffect() { if (effect) { cleanup?.(); const fn=effect; effect=null; cleanup=fn() } },
     dispose() { cleanup?.() },

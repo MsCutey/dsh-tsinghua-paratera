@@ -1,9 +1,7 @@
 # dsh-paratera-balance bundle patch
-# 固定官方余额端点；使用 DSH 凭据，默认不扫描浏览器 profile。
+# 余额取自清华算力平台用户信息接口；会话由专用浏览器 profile 自动维持，不保存密码。
 - insert:
     - id: paratera-balance
       name: dsh-paratera-balance
       config:
-        tokenRef: PARATERA_CONSOLE_TOKEN
         cacheMs: 5000
-        browserTokenAccess: false
