@@ -108,6 +108,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <插件目录>\scripts\setup
 | `--verify` 里 `moduleLinked=false` | 重新执行安装（会重跑 pnpm） |
 | 重启后设置页没有条目 | 检查 bundles 是否包含插件名，再看 DSH 启动日志 |
 | 界面显示「需登录」 | 正常：让用户点「重新登录」，或检查 `~/.dsh/easycompute-state.json` 的 `lastError` |
+| 点「保存凭据」后一直「启动中」且没有窗口 | 0.8.1 的 `detached: true` 会让 console host 直接退出而不执行脚本；0.8.2 已改为普通 spawn + `-WindowStyle Hidden`。升级后仍无窗口就看 `powershell.exe` 进程是否存活 |
 
 ## 卸载
 
