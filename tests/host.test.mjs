@@ -135,6 +135,10 @@ test('an open login browser produces actionable instructions instead of chrome-n
 test('only the documented routes exist', async () => {
   const h = host()
   assert.deepEqual([...h.routes.keys()].sort(), [
+    '/paratera-balance/api/2fa/cancel',
+    '/paratera-balance/api/2fa/choose',
+    '/paratera-balance/api/2fa/code',
+    '/paratera-balance/api/2fa/status',
     '/paratera-balance/api/balance',
     '/paratera-balance/api/console/connect',
     '/paratera-balance/api/console/status',
