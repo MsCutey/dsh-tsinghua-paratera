@@ -116,6 +116,7 @@ test('only the documented routes exist', async () => {
   const h = host()
   assert.deepEqual([...h.routes.keys()].sort(), [
     '/paratera-balance/api/balance',
+    '/paratera-balance/api/credentials',
     '/paratera-balance/api/login',
     '/paratera-balance/api/refresh',
     '/paratera-balance/api/status',

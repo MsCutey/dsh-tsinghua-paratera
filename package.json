@@ -1,6 +1,6 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "scripts": {
     "test": "node --test --test-force-exit tests/client.test.mjs tests/host.test.mjs"
   },
@@ -15,6 +15,7 @@
   },
   "files": [
     "lib",
+    "scripts",
     "cordis.patch.yml",
     "README.md"
   ],

@@ -1,7 +1,7 @@
 # dsh-paratera-balance
 
 DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力平台（easycompute）算力券余额**。
-版本 0.3.1，仅支持清华口径，不再读取并行智算云控制台。
+版本 0.3.2，仅支持清华口径。凭据保存在本机（DPAPI 加密），token 到期后可静默重登。
 
 ## 数据来源
 
@@ -12,8 +12,19 @@ DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力�
 | 续期 | 无头访问 `/home` 一次即自动续到 24 小时；插件每 5 分钟检查，剩余不足 1 小时则续期 |
 | 计划任务 | `DSH Paratera Token Refresh`，每 6 小时，DSH 关闭时也维持会话 |
 
-不保存密码，不做验证码绕过。登录态保存在独立 Chrome 配置目录
-`%LOCALAPPDATA%\dsh-paratera-profile`，由 Chrome 自身加密，与日常浏览器互不影响。
+密码以 DPAPI 加密保存在本机（仅当前 Windows 账户可解密）；登录态保存在独立 Chrome 配置目录
+`%LOCALAPPDATA%\dsh-paratera-profile`，与日常浏览器互不影响。插件不绕过验证码：
+一旦出现验证码即中止自动登录并提示人工处理。
+
+## 自动登录
+
+- 账号密码通过 Windows DPAPI（CurrentUser 作用域）加密存于 `~/.dsh/easycompute-credentials.bin`，
+  文件 ACL 收紧到当前用户；配置文件里没有明文密码。
+- token 失效时，插件用无头 Chrome 打开控制台，自动跳清华 SSO、填写账号密码并提交，
+  全程约 10–20 秒，无需人工。
+- 若登录页出现图形验证码（通常只在多次失败后触发），插件立即中止并显示「需登录」，
+  不会尝试绕过验证码。
+- 冷启动实测：清空 session/state/localStorage/cookies 后，13 秒完成静默登录并取回余额。
 
 ## 显示逻辑
 
@@ -28,7 +39,8 @@ DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力�
 - 登录状态、会话有效期、券余额/已用/总额
 - 最近自动刷新时间、最近错误
 - 「立即刷新」：用专用浏览器会话重新取数
-- 「重新登录」：打开专用浏览器窗口，走一次清华 SSO
+- 「重新登录」：打开专用浏览器窗口，手动走一次清华 SSO（验证码或改密后使用）
+- 「保存凭据」：打开本机凭据对话框，更新账号密码（DPAPI 加密）
 
 ## 宿主路由
 
@@ -37,6 +49,7 @@ GET  /paratera-balance/api/balance
 GET  /paratera-balance/api/status
 POST /paratera-balance/api/refresh
 POST /paratera-balance/api/login
+POST /paratera-balance/api/credentials
 ```
 
 全部先过 `connection.requestRejection`；token 只在宿主进程内使用，不下发浏览器；
