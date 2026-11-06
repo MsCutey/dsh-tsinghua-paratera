@@ -143,6 +143,27 @@ test('a second import tolerates parsed schema defaults and never persists them',
   assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), [MODEL, 'second-model']);
 });
 
+test('legacy 待校准 entries are upgraded to the recommended name and values', async () => {
+  const settings = settingsFixture({ paratera: {
+    displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
+    apiKeyEnv: REF, models: [{ id: 'Kimi-K3', name: 'Kimi-K3 (待校准)', contextWindow: 128000, maxTokens: 8192 }],
+  } });
+  const result = await appendModels(['Kimi-K3'], { settings });
+  assert.equal(result.ok, true);
+  assert.equal(result.updated, true);
+  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'] }]);
+});
+
+test('a user-chosen model name is never overwritten by the importer', async () => {
+  const settings = settingsFixture({ paratera: {
+    displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
+    apiKeyEnv: REF, models: [{ id: 'Kimi-K3', name: 'K3 高速版', contextWindow: 64000, maxTokens: 4096 }],
+  } });
+  await appendModels(['Qwen3.8-Max'], { settings });
+  assert.deepEqual(settings.providers.paratera.models[0], { id: 'Kimi-K3', name: 'K3 高速版', contextWindow: 64000, maxTokens: 4096 });
+  assert.equal(settings.providers.paratera.models[1].name, 'Qwen3.8-Max');
+});
+
 test('replace swaps the Paratera model list and reports what it removed', async () => {
   const settings = settingsFixture({ paratera: {
     displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',

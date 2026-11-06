@@ -169,7 +169,7 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
     assert.equal(llm.listConfigurableProviders().find((provider) => provider.provider === 'paratera').settingsNs, 'llm-pi-ai');
     assert.equal(llm.adapters.get('paratera').adapter, originalAdapter);
     assert.deepEqual((await llm.listModels('paratera')).map((model) => model.id), [MODEL]);
-    assert.equal((await llm.resolveModelInfo('paratera', MODEL)).context.contextWindow, 128000);
+    assert.equal((await llm.resolveModelInfo('paratera', MODEL)).context.contextWindow, 131072);
 
     // Add a second model without booting another adapter. Route-registration
     // facts do not change, so this also catches stale adapter profile snapshots.
@@ -186,7 +186,7 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
     assert.deepEqual(originalProvidersRef.get().paratera.models.map((model) => model.id), [MODEL, SECOND_MODEL]);
     assert.equal(llm.adapters.get('paratera').adapter, originalAdapter);
     assert.deepEqual((await llm.listModels('paratera')).map((model) => model.id), [MODEL, SECOND_MODEL]);
-    assert.equal((await llm.resolveModelInfo('paratera', SECOND_MODEL)).context.contextWindow, 128000);
+    assert.equal((await llm.resolveModelInfo('paratera', SECOND_MODEL)).context.contextWindow, 131072);
     assert.deepEqual((await llm.listModels('other')).map((model) => model.id), ['untouched']);
 
     // Idempotent import verifies the real directory even with no settings edit.

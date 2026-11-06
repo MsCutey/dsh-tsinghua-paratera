@@ -10,8 +10,9 @@ const deferred = () => { let resolve; const promise = new Promise((done) => { re
 const key = (overrides = {}) => ({ uuid: 'uuid-one', name: 'same-name', status: 'valid', models: ['model-a'], ...overrides })
 
 // Hook/element fixture only: no real React server, session, profile, or network.
-function fixture(handler = () => undefined) {
+function fixture(handler = () => undefined, options = {}) {
   let entry, component, cursor = 0, unmounted = false, writesAfterUnmount = 0, timerId = 0, nativeDialogCalls = 0
+  const sections = new Map()
   const hooks = [], effects = [], requests = [], intervals = new Map(), timers = new Map()
   const React = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children }),
@@ -62,10 +63,12 @@ function fixture(handler = () => undefined) {
   })
   entry.factory(() => React).apply({ slots: {
     inject: (_, fn) => fn(),
-    register: (spec, value) => { if (spec.name === 'settings.section') component = value },
+    register: (spec, value) => { if (spec.name === 'settings.section') sections.set(spec.id, value) },
   } })
+  component = sections.get(options.section === 'models' ? 'paratera-models' : 'paratera-balance')
   const fixture = {
-    requests, intervals, timers,
+    requests, intervals, timers, sections,
+    section(id) { return sections.get(id) },
     render() { cursor = 0; return component() },
     mount() { fixture.render(); for (const effect of effects.splice(0)) effect.cleanup = effect.fn() },
     replayEffects() {
@@ -556,7 +559,7 @@ test('model import starts empty, offers a select-all toggle, and caps explicit s
   f.click('import')
   assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 0)
   assert.match(text(f.byKey('picked')), /已选 0 \/ 200/)
-  assert.match(text(f.byKey('all')), /^全选$/)
+  assert.match(text(f.byKey('all')), /^全选（200）$/)
   assert.equal(f.byKey('go').props.disabled, true)
   await f.click('go'); assert.equal(importRequests(f).length, 0)
   f.click('all')
@@ -772,4 +775,80 @@ test('unmount cancels recovered import progress waits and prevents further statu
   assert.equal(f.requests.length, count)
   assert.equal(f.timers.size, 0)
   assert.equal(f.writesAfterUnmount, 0)
+})
+
+test('select-all follows the active filter instead of the whole catalog', async () => {
+  const models = ['Kimi-K3', 'Kimi-K3.1-Pro', 'Qwen3.8-Max', 'GLM-5']
+  const f = await loaded((r) => r.url.endsWith('/keys') ? response({ ok: true, keys: [key({ models })] }) : undefined)
+  f.click('import')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 0)
+  f.byKey('f').props.onChange({ target: { value: 'kimi' } })
+  assert.match(text(f.byKey('all')), /全选筛选（2）/)
+  f.click('all')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 2)
+  assert.match(text(f.byKey('picked')), /已选 2 \/ 4，当前筛选 2 个/)
+  f.byKey('f').props.onChange({ target: { value: '' } })
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 2)
+  f.click('all')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 4)
+  f.click('all')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 0)
+  f.dispose()
+})
+
+const modelRow = (overrides = {}) => ({
+  id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'],
+  recommended: { id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'] },
+  ...overrides,
+})
+
+function modelsFixture(handler) {
+  return fixture((r) => {
+    if (r.url !== '/paratera-balance/api/models') return response({ ok: true })
+    if (r.options.method === 'POST') return response({ ok: true, revision: 9, models: r.body.models })
+    return response({ ok: true, revision: 8, models: [modelRow()] })
+  }, { section: 'models' })
+}
+
+test('模型设置 loads the host list, edits fields and saves the exact model list', async () => {
+  const f = modelsFixture()
+  await tick()
+  assert.match(f.text(), /Kimi-K3/)
+  assert.match(f.text(), /恢复推荐值/)
+  f.find((n) => n.props['data-field'] === 'contextWindow').props.onChange({ target: { value: '200000' } })
+  f.find((n) => n.props['data-field'] === 'image').props.onChange()
+  f.find((n) => n.props['data-field'] === 'name').props.onChange({ target: { value: 'Kimi K3' } })
+  await f.click('save-models')
+  const posts = f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.equal(posts.length, 1)
+  assert.deepEqual(posts[0].body.models, [{ id: 'Kimi-K3', name: 'Kimi K3', contextWindow: 200000, maxTokens: 8192, input: ['text', 'image'] }])
+  assert.equal(posts[0].body.revision, 8)
+  assert.match(f.text(), /已保存 1 个模型设置/)
+  f.dispose()
+})
+
+test('模型设置 rejects invalid edits before the POST and can reset or delete a row', async () => {
+  const f = modelsFixture()
+  await tick()
+  f.find((n) => n.props['data-field'] === 'contextWindow').props.onChange({ target: { value: '0' } })
+  await f.click('save-models')
+  assert.equal(f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST').length, 0)
+  assert.match(f.text(), /模型设置无效/)
+  f.click('reset')
+  assert.equal(f.find((n) => n.props['data-field'] === 'contextWindow').props.value, 262144)
+  assert.equal(f.find((n) => n.props['data-field'] === 'name').props.value, 'Kimi-K3')
+  f.click('del')
+  assert.doesNotMatch(f.text(), /恢复推荐值/)
+  await f.click('save-models')
+  const posts = f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.deepEqual(posts[0].body.models, [])
+  f.dispose()
+})
+
+test('模型设置 shows a friendly error when the host has no Settings service', async () => {
+  const f = fixture((r) => r.url === '/paratera-balance/api/models' ? response({ ok: false, error: 'settings-unavailable' }) : response({ ok: true }), { section: 'models' })
+  await tick()
+  assert.match(f.text(), /宿主模型设置服务暂不可用/)
+  assert.equal(f.byKey('save-models').props.disabled, true)
+  f.dispose()
 })
