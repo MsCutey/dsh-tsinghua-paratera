@@ -130,8 +130,8 @@ API 密钥不是付费订阅，本插件不会创建“Codex 订阅”等其他�
 「模型设置」顶部是操作按钮，「一键最大值」把每行设成该模型的最大上下文与最大输出并立即保存，
 旁边是「保存模型设置」「重新读取」。
 下面每行可调整名称、上下文窗口、最大输出、输入类型（文本/图片）和思考挡位：
-挡位就是 low / medium / high / xhigh / max 几个复选，第一次勾选默认带出 low / high / max（点中间的挡位会再加一个），
-勾选后写入 `{ off: null, … }`，全部不勾选则跟随模型原生（不写 `reasoningEfforts`）。
+挡位就是 low / medium / high / xhigh / max 几个复选，**新导入或「恢复推荐值」的模型默认勾选 low / high / max**，
+可逐个增删（点中间的挡位会把它加上）；勾选后写入 `{ off: null, … }`，全部取消则跟随模型原生（不写 `reasoningEfforts`）。
 这里刻意没有“关闭思考”这一档：输入栏的 Off 只是不指定挡位，模型若本身总是思考，Off 也停不下来，所以不做一个名不副实的开关。
 保存走宿主修订号 Settings 接口，只替换 `llm-pi-ai.providers.paratera.models`，
 不会请求平台、不会重新读取密钥，也不会把 `modelOverrides: {}` 等解析默认值写回 profile。

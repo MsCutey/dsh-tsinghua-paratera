@@ -795,7 +795,7 @@ test('select-all follows the active filter instead of the whole catalog', async 
 
 const modelRow = (overrides = {}) => ({
   id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'],
-  recommended: { id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'] },
+  recommended: { id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'], reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' } },
   ...overrides,
 })
 

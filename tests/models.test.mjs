@@ -32,7 +32,7 @@ function settingsFixture() {
 }
 
 test('recommendations come from the captured platform and online catalogs', () => {
-  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 1024000, maxTokens: 393216, input: ['text', 'image'] });
+  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 1024000, maxTokens: 393216, input: ['text', 'image'], reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' } });
   assert.equal(recommendedModel('Kimi-K3').maxTokens, 943718);
   assert.equal(recommendedModel('GLM-4.6').maxTokens, 131072);
   assert.equal(recommendedMaxTokens(1024000), 131072);
@@ -56,7 +56,9 @@ test('recommendations come from the captured platform and online catalogs', () =
 test('normalizeModel rejects unservable rows and fills missing fields', () => {
   assert.equal(normalizeModel(null), null);
   assert.equal(normalizeModel({ id: 'bad\nmodel' }), null);
-  assert.deepEqual(normalizeModel({ id: 'Kimi-K3' }), recommendedModel('Kimi-K3'));
+  const { reasoningEfforts, ...plain } = recommendedModel('Kimi-K3');
+  // Reading a stored row never invents thinking levels; only new rows start with the trio.
+  assert.deepEqual(normalizeModel({ id: 'Kimi-K3' }), plain);
   assert.equal(normalizeModel({ id: 'Kimi-K3', name: '   ' }).name, 'Kimi-K3');
   assert.equal(normalizeModel({ id: 'Kimi-K3', contextWindow: 0 }).contextWindow, 1024000);
   assert.deepEqual(normalizeModel({ id: 'Kimi-K3', input: ['audio'] }).input, recommendedModel('Kimi-K3').input);

@@ -151,7 +151,7 @@ test('legacy 待校准 entries are upgraded to the recommended name and values',
   const result = await appendModels(['Kimi-K3'], { settings });
   assert.equal(result.ok, true);
   assert.equal(result.updated, true);
-  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'] }]);
+  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'], reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' } }]);
 });
 
 test('a user-chosen model name is never overwritten by the importer', async () => {
@@ -176,6 +176,16 @@ test('imports only ever append: existing entries survive untouched', async () =>
   assert.deepEqual(result.added, ['new']);
   assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), ['keep', 'drop', 'new']);
   assert.equal(settings.providers.paratera.models[0].name, undefined, 'kept entries keep their stored shape');
+});
+
+test('newly imported models start with low/high/max thinking levels pre-selected', async () => {
+  const settings = settingsFixture({ paratera: {
+    displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
+    apiKeyEnv: REF, models: [],
+  } });
+  const result = await appendModels(['Kimi-K3'], { settings });
+  assert.equal(result.ok, true);
+  assert.deepEqual(settings.providers.paratera.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max' });
 });
 
 test('invalid model IDs are rejected rather than silently skipped', async () => {
