@@ -151,7 +151,7 @@ test('legacy 待校准 entries are upgraded to the recommended name and values',
   const result = await appendModels(['Kimi-K3'], { settings });
   assert.equal(result.ok, true);
   assert.equal(result.updated, true);
-  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 32768, input: ['text', 'image'] }]);
+  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'] }]);
 });
 
 test('a user-chosen model name is never overwritten by the importer', async () => {

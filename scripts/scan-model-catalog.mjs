@@ -74,11 +74,33 @@ async function main() {
         reasoning: tags.some((tag) => /深度思考|强推理|推理模型/.test(tag)) || /推理模型|深度思考|思维链/.test(info.intro || ''),
       };
     }
+    // OpenRouter's public catalog publishes max_completion_tokens per model;
+    // Paratera's own endpoints publish no output cap. Match on the bare model
+    // id (after the vendor prefix) and ignore punctuation/case.
+    let maxOutputs = new Map();
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(20000) });
+      if (response.ok) {
+        const body = await response.json();
+        const normalize = (value) => String(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+        maxOutputs = new Map((body.data ?? []).flatMap((model) => {
+          const id = String(model.id ?? '');
+          const bare = id.includes('/') ? id.slice(id.indexOf('/') + 1) : id;
+          const cap = model.top_provider?.max_completion_tokens ?? model.max_completion_tokens;
+          return bare && Number.isFinite(cap) && cap > 0 ? [[normalize(bare), cap]] : [];
+        }));
+      }
+    } catch { /* offline: keep the plaza-only catalog */ }
     const ids = Object.keys(catalog).sort();
-    const lines = ids.map((id) => `  ${JSON.stringify(id)}: { contextWindow: ${catalog[id].contextWindow}, vision: ${catalog[id].vision}, reasoning: ${catalog[id].reasoning} }`).join(',\n');
-    const body = `// Context lengths captured from ai.paratera.com model plaza detail dialogs.\n// Regenerate with scripts/scan-model-catalog.mjs when the platform catalog changes.\nexport const MODEL_CATALOG = {\n${lines}\n};\n`;
+    const lines = ids.map((id) => {
+      const row = catalog[id];
+      const maxOutput = maxOutputs.get(id.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const tail = maxOutput ? `, maxOutput: ${Math.min(maxOutput, row.contextWindow)}` : '';
+      return `  ${JSON.stringify(id)}: { contextWindow: ${row.contextWindow}, vision: ${row.vision}, reasoning: ${row.reasoning}${tail} }`;
+    }).join(',\n');
+    const body = `// Context lengths from ai.paratera.com model plaza detail dialogs; output caps\n// from OpenRouter's public catalog when a model matches. Regenerate with\n// scripts/scan-model-catalog.mjs when either source changes.\nexport const MODEL_CATALOG = {\n${lines}\n};\n`;
     writeFileSync(OUTPUT, body);
-    console.log(JSON.stringify({ ok: true, models: ids.length, output: OUTPUT }));
+    console.log(JSON.stringify({ ok: true, models: ids.length, maxOutputs: [...maxOutputs.keys()].length, output: OUTPUT }));
   } finally {
     try { if (opened && !opened.error) await closePage(opened); } catch {}
     release();

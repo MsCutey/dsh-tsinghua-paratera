@@ -799,7 +799,7 @@ test('select-all follows the active filter instead of the whole catalog', async 
 
 const modelRow = (overrides = {}) => ({
   id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'],
-  recommended: { id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'] },
+  recommended: { id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text', 'image'] },
   ...overrides,
 })
 
@@ -868,6 +868,18 @@ test('模型设置 can apply one max output value to every imported model', asyn
   f.dispose()
 })
 
+test('一键最大值 applies each model recommendation and saves it immediately', async () => {
+  const f = modelsFixture()
+  await tick()
+  await f.click('max-all')
+  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.deepEqual(post.body.models, [{
+    id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text'],
+  }])
+  assert.match(f.text(), /已保存 1 个模型设置/)
+  f.dispose()
+})
+
 test('模型设置 rejects invalid edits before the POST and can reset or delete a row', async () => {
   const f = modelsFixture()
   await tick()
@@ -876,7 +888,7 @@ test('模型设置 rejects invalid edits before the POST and can reset or delete
   assert.equal(f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST').length, 0)
   assert.match(f.text(), /模型设置无效/)
   f.click('reset')
-  assert.equal(f.find((n) => n.props['data-field'] === 'contextWindow').props.value, 262144)
+  assert.equal(f.find((n) => n.props['data-field'] === 'contextWindow').props.value, 1024000)
   assert.equal(f.find((n) => n.props['data-field'] === 'name').props.value, 'Kimi-K3')
   f.click('del')
   assert.doesNotMatch(f.text(), /恢复推荐值/)
