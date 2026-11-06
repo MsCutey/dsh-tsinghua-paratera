@@ -1,6 +1,6 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
     "install:dsh": "node scripts/install.mjs",

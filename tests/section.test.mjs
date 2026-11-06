@@ -550,24 +550,35 @@ test('unmount aborts a form mutation with no late refresh or draft writes', asyn
   assert.equal(f.timers.size, 0)
 })
 
-test('model import defaults to all models, has a 200-model cap, and cannot send an empty explicit selection', async () => {
+test('model import starts empty, offers a select-all toggle, and caps explicit selection at 200', async () => {
   const models = Array.from({ length: 201 }, (_, i) => `mock-model-${i}`)
   const f = await loaded((r) => r.url.endsWith('/keys') ? response({ ok: true, keys: [key({ models })] }) : undefined)
   f.click('import')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 0)
+  assert.match(text(f.byKey('picked')), /已选 0 \/ 200/)
+  assert.match(text(f.byKey('all')), /^全选$/)
+  assert.equal(f.byKey('go').props.disabled, true)
+  await f.click('go'); assert.equal(importRequests(f).length, 0)
+  f.click('all')
   assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 200)
+  assert.match(text(f.byKey('all')), /取消全选/)
+  assert.match(text(f.byKey('picked')), /已选 200 \/ 200/)
   assert.match(text(f.byKey('go')), /导入并添加到模型列表（200 个）/)
   f.byKey('f').props.onChange({ target: { value: 'mock-model-200' } })
   assert.equal(walk(f.render()).find((n) => n.props.type === 'checkbox').props.disabled, true)
-  f.byKey('f').props.onChange({ target: { value: '' } }); clearSelection(f)
+  f.byKey('f').props.onChange({ target: { value: '' } })
+  f.click('all')
+  assert.equal(walk(f.render()).filter((n) => n.props.type === 'checkbox' && n.props.checked).length, 0)
   assert.equal(f.byKey('go').props.disabled, true)
-  await f.click('go'); assert.equal(importRequests(f).length, 0)
   assert.equal(f.byKey('keyonly').props.disabled, false)
+  f.click('all'); await f.click('go')
+  assert.deepEqual(importRequests(f)[0].body, { uuid: 'uuid-one', models: models.slice(0, 200) })
   f.dispose()
 })
 
 test('successful model registration points to the actual model list, not a paid subscription', async () => {
   const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, providerRegistered: true, modelsAvailable: true, modelsAdded: ['model-a'] }) : undefined)
-  f.click('import'); await f.click('go')
+  f.click('import'); f.click('all'); await f.click('go')
   assert.deepEqual(importRequests(f)[0].body, { uuid: 'uuid-one', models: ['model-a'] })
   assert.match(text(f.byKey('key-notice')), /已添加到模型列表：Paratera.*模型 → Paratera/)
   assert.match(f.text(), /API key 不是付费订阅/)
@@ -578,7 +589,7 @@ test('successful model registration points to the actual model list, not a paid 
 for (const code of ['model-directory-unavailable', 'model-directory-missing-models', 'provider-not-registered']) {
   test(`directory check ${code} accurately preserves saved configuration as partial success`, async () => {
     const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: false, credentialImported: true, modelConfigUpdated: true, modelError: code }) : undefined)
-    f.click('import'); await f.click('go')
+    f.click('import'); f.click('all'); await f.click('go')
     assert.match(text(f.byKey('key-notice')), /密钥已导入 DSH.*模型配置已保存.*模型列表确认未完成/)
     assert.ok(picker(f)); assert.equal(f.byKey('key-notice').props.role, 'alert')
     f.dispose()
@@ -627,7 +638,7 @@ test('local import displays phase progress, ignores old completion, and stops po
       ? { ok: true, running: false, stage: 'completed', startedAt: 1, operationId: 'mock-old', result: { ok: true, credentialImported: true } }
       : { ok: true, running: true, stage: 'saving', startedAt: Date.now(), operationId: 'mock-new' })
   })
-  f.click('import'); const task = f.click('go')
+  f.click('import'); f.click('all'); const task = f.click('go')
   assert.match(text(f.byKey('go')), /正在导入并添加模型/)
   assert.match(text(f.byKey('keyonly')), /仅保存密钥/)
   f.fireTimer(2000); await tick()
@@ -662,7 +673,7 @@ test('progress requests never overlap and late status responses cannot overwrite
 
 test('an inconsistent modelsAvailable false result cannot close the picker as full success', async () => {
   const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, modelConfigUpdated: true, providerRegistered: true, modelsAvailable: false }) : undefined)
-  f.click('import'); await f.click('go')
+  f.click('import'); f.click('all'); await f.click('go')
   assert.ok(picker(f))
   assert.match(text(f.byKey('key-notice')), /密钥已导入 DSH.*尚未全部出现在宿主列表/)
   assert.equal(f.byKey('key-notice').props.role, 'alert')

@@ -11,22 +11,25 @@ const classList = (...classes) => ({ contains: (name) => classes.includes(name) 
 
 // Tiny DOM doubles execute the actual serialized page function, not a regex
 // approximation of its result. No browser, network or on-disk sessions are used.
-function makeRow({ uuid, name, secret = SECRET, eye = true, revealed = false, nameTitle } = {}) {
+function makeRow({ uuid, name, secret = SECRET, eye = true, revealed = false, nameTitle, button = false, nameAt = 0 } = {}) {
   const state = { clicks: 0, revealed };
   const nameCell = { innerText: name, querySelectorAll: () => nameTitle ? [{ getAttribute: () => nameTitle }] : [] };
   const secretCell = {
     get innerText() { return state.revealed ? secret : 'sk-********'; },
     querySelectorAll: () => [],
   };
+  const cells = [...Array(nameAt).fill(null).map(() => ({ innerText: '', querySelectorAll: () => [] })), nameCell, secretCell];
+  // Real rows wrap the eye in an antd link button; other fixtures use a bare span.
+  const control = button ? { click() { state.clicks += 1; state.revealed = true; } } : null;
   const icon = {
-    closest: () => secretCell,
+    closest: (selector) => control && selector === 'button,a' ? control : secretCell,
     dispatchEvent() { state.clicks += 1; state.revealed = true; },
   };
   return {
     state, classList: classList(),
     get innerText() { return name + '\n' + secretCell.innerText; },
     getAttribute: (attribute) => attribute === 'data-row-key' ? uuid : null,
-    querySelectorAll: (selector) => selector === 'td' ? [nameCell, secretCell] : [],
+    querySelectorAll: (selector) => selector === 'td' ? cells : [],
     querySelector(selector) {
       if (selector === 'td') return nameCell;
       if (!eye) return null;
@@ -154,6 +157,20 @@ test('name fallback supports full titles on truncated name cells and fails close
   assert.equal((await revealKeySecret('selected', titled.deps)).secret, SECRET);
   const missing = fixture({ pages: [[selected]], headers: ['未知列', 'API Key'] });
   assert.deepEqual(await revealKeySecret('selected', missing.deps), { ok: false, error: 'key-name-column-not-found' });
+});
+
+test('the console 名称/描述 column is recognised and the eye is clicked through its button', async () => {
+  const selected = makeRow({ uuid: '0', name: 'selected', button: true, nameAt: 3 });
+  const { deps } = fixture({
+    pages: [[selected]],
+    keys: [key('selected-id', 'selected')],
+    headers: ['密钥', '支持模型', '状态', '名称/描述', '创建时间', '操作'],
+  });
+  assert.equal((await revealKeySecret('selected', deps)).secret, SECRET);
+  assert.equal(selected.state.clicks, 1);
+  const missing = makeRow({ uuid: '0', name: 'selected' });
+  const unrelated = fixture({ pages: [[missing]], keys: [key('selected-id', 'selected')], headers: ['支持模型', '操作'] });
+  assert.deepEqual(await revealKeySecret('selected', unrelated.deps), { ok: false, error: 'key-name-column-not-found' });
 });
 
 test('duplicate UUID DOM rows fail closed without clicking any eye', async () => {
