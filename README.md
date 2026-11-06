@@ -151,6 +151,25 @@ API 密钥不是付费订阅，本插件不会创建“Codex 订阅”等其他�
 更新插件代码后仍须从托盘完全退出并重启 DSH；上述即时更新指模型配置，不是插件代码热替换。
 当前自动化验证使用隔离数据与已安装宿主 SDK；真实账号的控制台页面和导入结果仍需用户在重启后验收。
 
+## 兼容性
+
+插件没有直接 `import` 任何 `@deepseek-ai/*` 内部包，只通过宿主注入的服务和前端 slot 工作，但这仍然是运行时契约：
+
+- 宿主服务：`webServer`、`credentials`、`connection` 必需；`llm`、`settings` 为可选注入（缺失时余额/密钥仍可用，模型相关功能降级）；
+- 前端：只声明 `slots` 一个注入；`modelDirectories` 改为运行时探测，取不到就用空 store（输入栏标签隐藏，而不是整块客户端崩掉）；
+- 两个 slot（`settings.section` 与 `conversation.input.right`）**独立注册并各自捕获异常**：DSH 若改名其中一个，另一个仍然生效。
+
+升级 DSH 后可以看诊断接口或设置页底部：
+
+```bash
+GET /paratera-balance/api/diagnostics
+# { plugin: { version }, host: { version, compatibility }, services: {...}, client: { ageMs } }
+```
+
+设置页底部会显示「宿主 DSH 0.2.1-rc.5 · 插件 0.16.0 · 客户端已连接」；若宿主版本超出验证区间（当前 `>=0.2.0 <0.3.0`），这一行会变成橙色并注明未验证。`client.ageMs` 为空表示前端 bundle 没有加载起来——这正是升级后最常见的失效方式。
+
+升级后建议跑一次 `node scripts/verify-host-sdk.mjs --electron '<DSH 可执行文件>'`，再用隔离宿主脚本验证客户端 bundle 与路由。
+
 ## 宿主路由
 
 ```
@@ -169,6 +188,8 @@ POST /paratera-balance/api/keys/import
 POST /paratera-balance/api/keys/refresh-models
 GET  /paratera-balance/api/models
 POST /paratera-balance/api/models
+GET  /paratera-balance/api/diagnostics
+POST /paratera-balance/api/diagnostics/hello
 ```
 
 全部先过 `connection.requestRejection`；token 和完整 API 密钥只在宿主进程内使用，不下发浏览器。

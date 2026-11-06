@@ -173,6 +173,25 @@ test('models route reads and writes through the injected Settings service', asyn
   f.dispose();
 });
 
+test('diagnostics route reports versions, services and the client heartbeat', async () => {
+  const f = fixture(async () => ({ ok: true }), { settings: settingsFixture() });
+  const diag = await f.request(null, { method: 'GET', route: '/paratera-balance/api/diagnostics' });
+  assert.equal(diag.status, 200);
+  assert.equal(diag.body.ok, true);
+  assert.equal(typeof diag.body.plugin.version, 'string');
+  assert.equal(diag.body.services.settings, true);
+  assert.equal(diag.body.services.llm, true);
+  assert.equal(diag.body.client.lastSeenAt, null);
+  const wrong = await f.request({}, { method: 'POST', route: '/paratera-balance/api/diagnostics' });
+  assert.equal(wrong.status, 405);
+  const hello = await f.request({}, { method: 'POST', route: '/paratera-balance/api/diagnostics/hello' });
+  assert.equal(hello.status, 200);
+  assert.equal(hello.body.ok, true);
+  const again = await f.request(null, { method: 'GET', route: '/paratera-balance/api/diagnostics' });
+  assert.ok(again.body.client.ageMs >= 0);
+  f.dispose();
+});
+
 test('models route rejects anonymous, wrong-method and malformed bodies', async () => {
   const anonymous = fixture(async () => ({ ok: true }), { rejection: 401 });
   assert.equal((await anonymous.request(null, { method: 'GET' })).status, 401);

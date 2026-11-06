@@ -68,7 +68,7 @@ function fixture(handler = () => undefined, options = {}) {
   } })
   component = options.component === 'models' ? plugin.components.ModelsPanel : sections.get('paratera-balance')
   const fixture = {
-    requests, intervals, timers, sections,
+    plugin, requests, intervals, timers, sections,
     section(id) { return sections.get(id) },
     render() { cursor = 0; return component() },
     mount() { fixture.render(); for (const effect of effects.splice(0)) effect.cleanup = effect.fn() },
@@ -270,12 +270,13 @@ test('unmount aborts import and prevents refreshes and state writes even if fetc
 test('status polling is nonoverlapping and stops its chain on unmount', async () => {
   const pending = deferred()
   const f = fixture((r) => r.url.endsWith('/api/status') ? pending.promise : undefined)
+  const tracked = (r) => !r.url.endsWith('/import/status') && !/\/diagnostics(\/hello)?$/.test(r.url)
   await Promise.all([...f.intervals.values()].map((fn) => fn()))
-  assert.equal(f.requests.filter((r) => !r.url.endsWith('/import/status')).length, 1)
+  assert.equal(f.requests.filter(tracked).length, 1)
   f.dispose()
-  assert.equal(f.requests[0].options.signal.aborted, true)
+  assert.equal(f.requests.find((r) => r.url.endsWith('/api/status')).options.signal.aborted, true)
   pending.resolve(response({ ok: true })); await tick()
-  assert.equal(f.requests.filter((r) => !r.url.endsWith('/import/status')).length, 1)
+  assert.equal(f.requests.filter(tracked).length, 1)
   assert.equal(f.writesAfterUnmount, 0)
 })
 
@@ -295,7 +296,7 @@ test('StrictMode effect replay does not allow an aborted status request to overw
   let statuses = 0
   const f = fixture((r) => r.url.endsWith('/api/status') ? (++statuses === 1 ? pending.promise : response({ ok: true, tokenValid: true })) : undefined)
   f.replayEffects(); await tick()
-  assert.equal(f.requests[0].options.signal.aborted, true)
+  assert.equal(f.requests.find((r) => r.url.endsWith('/api/status')).options.signal.aborted, true)
   assert.match(f.text(), /已登录/)
   assert.equal(f.timers.size, 0)
   pending.resolve(response({ ok: true, tokenValid: false })); await tick()
@@ -806,6 +807,56 @@ function modelsFixture(handler, options = {}) {
     return response({ ok: true, revision: 8, models: options.rows ?? [modelRow()] })
   }), { component: 'models' })
 }
+
+test('the settings section survives a missing or broken composer slot', () => {
+  const sections = new Map()
+  const ctx = {
+    slots: {
+      inject(name, fn) {
+        if (name === 'conversation.input.right') throw Error('slot renamed upstream')
+        return fn()
+      },
+      register(spec, value) { if (spec.name === 'settings.section') sections.set(spec.id, value) },
+    },
+  }
+  fixture().plugin.apply(ctx)
+  assert.deepEqual([...sections.keys()], ['paratera-balance'])
+})
+
+test('the composer slot falls back to an empty store when modelDirectories is gone', () => {
+  let injected
+  const ctx = {
+    slots: {
+      inject(name, fn) { fn() },
+      register(spec) {
+        if (spec.name === 'conversation.input.right') injected = spec.inject({ id: 'session-1' })
+      },
+    },
+  }
+  fixture().plugin.apply(ctx)
+  const store = injected.directory
+  assert.equal(Object.keys(store.getSnapshot()).length, 0)
+  let notified = 0
+  const off = store.subscribe(() => { notified += 1 })
+  off()
+  assert.equal(notified, 0)
+})
+
+test('diagnostics footer reports host, plugin and compatibility', async () => {
+  const f = fixture((r) => r.url.endsWith('/diagnostics') ? response({
+    ok: true,
+    plugin: { version: '9.9.9', startedAt: 1 },
+    host: { version: '0.2.1-rc.5', compatibility: { ok: true, version: '0.2.1-rc.5', tested: '0.2.0 – 0.3.0 (不含 0.3.0)' } },
+    services: {},
+    client: { lastSeenAt: null, ageMs: null },
+  }) : undefined)
+  await tick()
+  assert.match(f.text(), /宿主 DSH 0\.2\.1-rc\.5/)
+  assert.match(f.text(), /插件 9\.9\.9/)
+  assert.match(f.text(), /客户端已连接/)
+  f.dispose()
+})
+
 
 test('the plugin page registers one section whose second tab mounts the models panel', async () => {
   const f = fixture()

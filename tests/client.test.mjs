@@ -20,7 +20,7 @@ function fixture(provider = 'paratera') {
     window: { __ModuleLoader__: { load: v => { entry = v } } },
     document, AbortController, setTimeout, clearTimeout,
     setInterval: fn => { intervals.set(++id, fn); return id }, clearInterval: key => intervals.delete(key),
-    fetch: async (url, opts) => { requests.push({url,opts}); return {ok:true,json:async()=>({ok:true,balance:983.02,availableQuota:983.02,calculationVerified:false,calculationNote:'估算'})} },
+    fetch: async (url, opts) => { if (!String(url).includes('/diagnostics')) requests.push({url,opts}); return {ok:true,json:async()=>({ok:true,balance:983.02,availableQuota:983.02,calculationVerified:false,calculationNote:'估算'})} },
   })
   const plugin = entry.factory(name => { assert.equal(name,'react'); return React })
   const stores = new Map()
