@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { applyAgent } from '../scripts/setup-macos-task.mjs';
+import { applyAgent, agentLabel, LABEL } from '../scripts/setup-macos-task.mjs';
+
+test('custom homes use stable distinct labels without replacing the desktop agent', () => {
+  assert.equal(agentLabel(path.join(os.homedir(), '.dsh')), LABEL);
+  assert.equal(agentLabel('/tmp/home-a'), agentLabel('/tmp/home-a'));
+  assert.notEqual(agentLabel('/tmp/home-a'), LABEL);
+  assert.notEqual(agentLabel('/tmp/home-a'), agentLabel('/tmp/home-b'));
+});
 
 function fixture(t, { loaded = true, bootoutFails = false, bootstrapFails = false, lintFails = false } = {}) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'balance-agent-'));

@@ -291,6 +291,29 @@ test('credential polling wait is cancelled on unmount without later requests', a
   assert.equal(f.writesAfterUnmount, 0)
 })
 
+test('existing credentials do not trigger login until the Mac credential window closes', async () => {
+  let dialog = true
+  const f = fixture((r) => r.url.endsWith('/credentials/status') ? response({ saved: true, dialog, dialogResult: dialog ? null : 'saved' }) : undefined)
+  await tick()
+  const task = f.click('cred'); await tick()
+  f.fireTimer(1000); await tick()
+  assert.equal(f.requests.some((r) => r.url.endsWith('/api/refresh')), false)
+  dialog = false
+  f.fireTimer(1000); await task
+  assert.equal(f.requests.filter((r) => r.url.endsWith('/api/refresh')).length, 1)
+  f.dispose()
+})
+
+test('cancelling Mac credential rotation preserves the old credential without automatic login', async () => {
+  const f = fixture((r) => r.url.endsWith('/credentials/status') ? response({ saved: true, dialog: false, dialogResult: 'cancelled' }) : undefined)
+  await tick()
+  const task = f.click('cred'); await tick()
+  f.fireTimer(1000); await task
+  assert.match(f.text(), /已取消，原有凭据保持不变/)
+  assert.equal(f.requests.some((r) => r.url.endsWith('/api/refresh')), false)
+  f.dispose()
+})
+
 test('StrictMode effect replay does not allow an aborted status request to overwrite current state', async () => {
   const pending = deferred()
   let statuses = 0

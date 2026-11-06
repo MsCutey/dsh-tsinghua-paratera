@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {
   parseVersion, compareVersions, compatibility, hostVersion, pluginVersion, TESTED_DSH_RANGE,
 } from '../lib/compat.mjs';
@@ -20,14 +21,14 @@ test('versions parse, compare and classify against the tested range', () => {
 });
 
 test('hostVersion reads the packaged DSH manifest from any known layout', () => {
-  const resources = 'C:\\DSH\\resources';
+  const resources = path.join(path.parse(process.cwd()).root, 'DSH test', 'resources');
   const read = (file) => {
-    if (file.endsWith('dsh\\node_modules\\@deepseek-ai\\dsh\\package.json')) return JSON.stringify({ version: '0.2.4' });
+    if (file === path.join(resources, 'app.asar', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'package.json')) return JSON.stringify({ version: '0.2.4' });
     throw Object.assign(Error('missing'), { code: 'ENOENT' });
   };
   assert.equal(hostVersion({ resources, read }), '0.2.4');
   const fallback = (file) => {
-    if (file.endsWith('dsh\\package.json')) return JSON.stringify({ version: '0.2.9' });
+    if (file === path.join(resources, 'app.asar', 'dsh', 'package.json')) return JSON.stringify({ version: '0.2.9' });
     throw Object.assign(Error('missing'), { code: 'ENOENT' });
   };
   assert.equal(hostVersion({ resources, read: fallback }), '0.2.9');

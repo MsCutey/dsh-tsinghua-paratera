@@ -14,7 +14,7 @@ test('temporary Mac profile installs, verifies, reinstalls, and uninstalls throu
   fs.writeFileSync(manifestPath, JSON.stringify({ name: 'temporary-test-profile', private: true, dependencies: {}, dsh: { profile: { bundles: ['existing-bundle'] } }, preserved: { test: true } }));
   const script = fileURLToPath(new URL('../scripts/install.mjs', import.meta.url));
   const run = (...args) => {
-    const child = spawnSync(process.execPath, [script, '--dsh-home', home, ...args], {
+    const child = spawnSync(process.execPath, [script, '--dsh-home', home, '--no-task', ...args], {
       encoding: 'utf8', timeout: 60000,
       env: { ...process.env, npm_config_store_dir: path.join(home, 'store'), XDG_CACHE_HOME: path.join(home, 'cache'), CI: 'true' },
     });

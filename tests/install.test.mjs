@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { planManifest, PACKAGE_NAME } from '../scripts/install.mjs'
+import path from 'node:path'
+import { planManifest, PACKAGE_NAME, runBackgroundTask } from '../scripts/install.mjs'
 import { resolveInstallPlan } from '../lib/platform.mjs'
 
 const PLUGIN = 'F:\\Vibe Coding\\插件开发\\dsh-paratera-balance'
@@ -62,4 +63,25 @@ test('unsupported platforms fail loudly instead of installing partially', () => 
   assert.equal(plan.supported, false)
   assert.equal(plan.reason, 'unsupported-platform')
   assert.equal(plan.task, null)
+})
+
+test('Mac task installation and removal preserve the selected DSH_HOME', () => {
+  const dshHome = path.join(path.parse(process.cwd()).root, 'tmp', 'test dsh')
+  for (const uninstall of [false, true]) {
+    let call
+    const result = runBackgroundTask({ plan: resolveInstallPlan('darwin'), dshHome, uninstall,
+      run: (file, args, options) => { call = { file, args, options }; return { status: 0, stdout: '{"ok":true}' } },
+    })
+    assert.equal(result.ok, true)
+    assert.equal(call.options.env.DSH_HOME, dshHome)
+    assert.equal(call.args.includes('--remove'), uninstall)
+  }
+})
+
+test('a failed task registration is exposed to the installer summary', () => {
+  const result = runBackgroundTask({ plan: resolveInstallPlan('darwin'), dshHome: '/tmp/test dsh',
+    run: () => ({ status: 1, stderr: 'test-only bootstrap failure' }),
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.tail, /bootstrap failure/)
 })

@@ -6,8 +6,8 @@
 //   node scripts/install.mjs --dry-run  show planned changes only
 //   node scripts/install.mjs --uninstall
 //
-// The script only edits the profile manifest and runs pnpm; it never reads or
-// writes credentials. Prints a JSON summary on stdout for agent consumption.
+// Edits the profile manifest, runs pnpm and manages the native background task.
+// It never reads/writes account credentials. Prints a JSON summary for agents.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -95,6 +95,21 @@ export function findPnpm(nodeExecutable = process.execPath) {
   return { kind: 'path', path: 'pnpm' };
 }
 
+export function runBackgroundTask({ plan, pluginDir = PLUGIN_DIR, dshHome, uninstall = false, run = spawnSync }) {
+  if (!plan.task) return { ok: false, error: 'task-unavailable' };
+  const scriptPath = path.join(pluginDir, plan.task.script);
+  const summary = { kind: plan.task.kind, script: path.basename(scriptPath), action: uninstall ? 'remove' : 'install' };
+  if (!fs.existsSync(scriptPath)) return { ...summary, ok: false, error: 'task-script-missing' };
+  const execution = plan.task.kind === 'powershell'
+    ? { file: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PluginDir', pluginDir] }
+    : { file: process.execPath, args: [scriptPath, ...(uninstall ? ['--remove'] : [])] };
+  const result = run(execution.file, execution.args, {
+    encoding: 'utf8', timeout: 120000,
+    env: { ...process.env, DSH_HOME: path.resolve(dshHome), PATH: path.dirname(process.execPath) + path.delimiter + (process.env.PATH || '') },
+  });
+  return { ...summary, ok: result.status === 0, tail: (result.status === 0 ? result.stdout || '' : result.stderr || result.stdout || result.error?.message || '').trim().split('\n').slice(-6).join('\n') };
+}
+
 function runPnpm(profileDir, pnpm, extraArgs = []) {
   const args = pnpm.kind === 'script'
     ? [pnpm.path, 'install', '--no-frozen-lockfile', '--dir', profileDir, ...extraArgs]
@@ -171,8 +186,16 @@ async function main() {
   summary.changed = plan.changed;
 
   if (options.dryRun) {
-    console.log(JSON.stringify({ ...summary, ok: true, wouldWrite: plan.changed, link: plan.link, nextManifest: options.json ? plan.manifest : undefined }, null, 2));
+    console.log(JSON.stringify({ ...summary, ok: true, wouldWrite: plan.changed, link: plan.link, taskRequested: options.task, nextManifest: options.json ? plan.manifest : undefined }, null, 2));
     return;
+  }
+
+  if (options.uninstall && options.task && process.platform === 'darwin') {
+    summary.task = runBackgroundTask({ plan: platformPlan, dshHome: options.dshHome, uninstall: true });
+    if (!summary.task.ok) {
+      console.log(JSON.stringify({ ...summary, error: 'task-removal-failed', hint: 'profile was not changed; stop the background agent before uninstalling' }, null, 2));
+      process.exit(1);
+    }
   }
 
   if (process.platform === 'darwin' && !options.uninstall) {
@@ -199,23 +222,13 @@ async function main() {
   }
 
   if (options.task && !options.uninstall && platformPlan.task) {
-    const scriptPath = path.join(PLUGIN_DIR, platformPlan.task.script);
-    const execution = platformPlan.task.kind === 'powershell'
-      ? { file: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PluginDir', PLUGIN_DIR] }
-      : { file: process.execPath, args: [scriptPath] };
-    summary.task = { kind: platformPlan.task.kind, script: path.basename(scriptPath) };
-    if (!fs.existsSync(scriptPath)) {
-      summary.task.ok = false;
-      summary.task.error = 'task-script-missing';
-    } else {
-      const run = spawnSync(execution.file, execution.args, { encoding: 'utf8', timeout: 1000 * 120 });
-      summary.task.ok = run.status === 0;
-      summary.task.tail = (run.status === 0 ? run.stdout : run.stderr || run.stdout || '').trim().split(String.fromCharCode(10)).slice(-6).join(String.fromCharCode(10));
-    }
+    summary.task = runBackgroundTask({ plan: platformPlan, dshHome: options.dshHome });
   }
 
   const state = inspect(profileDir);
-  summary.ok = options.uninstall ? !state.bundleListed && !state.linked : state.linked && state.bundleListed && state.moduleLinked;
+  summary.profileReady = options.uninstall ? !state.bundleListed && !state.linked : state.linked && state.bundleListed && state.moduleLinked;
+  summary.ok = summary.profileReady && summary.task?.ok !== false;
+  if (summary.task?.ok === false) summary.error = 'background-task-failed';
   summary.state = { linked: state.linked, bundleListed: state.bundleListed, moduleLinked: state.moduleLinked };
   summary.next = options.uninstall
     ? ['restart DSH']

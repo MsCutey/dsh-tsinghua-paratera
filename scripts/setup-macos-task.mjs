@@ -5,18 +5,25 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 export const LABEL = 'cn.edu.tsinghua.dsh-paratera-balance.refresh';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const xml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 
-export function makePlist({ node = process.execPath, pluginDir = ROOT, dshHome = process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), interval = 21600 } = {}) {
+export function agentLabel(dshHome = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')) {
+  const resolved = path.resolve(dshHome);
+  return resolved === path.join(os.homedir(), '.dsh') ? LABEL
+    : `${LABEL}.${createHash('sha256').update(resolved).digest('hex').slice(0, 12)}`;
+}
+
+export function makePlist({ node = process.execPath, pluginDir = ROOT, dshHome = process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), interval = 21600, label = agentLabel(dshHome) } = {}) {
   if (!Number.isSafeInteger(interval) || interval < 300) throw new Error('interval must be an integer >= 300 seconds');
   if (![node, pluginDir, dshHome].every(path.isAbsolute)) throw new Error('all paths must be absolute');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>${LABEL}</string>
+  <key>Label</key><string>${xml(label)}</string>
   <key>ProgramArguments</key><array>
     <string>${xml(node)}</string><string>${xml(path.join(pluginDir, 'lib', 'scheduled.mjs'))}</string>
   </array>
@@ -37,7 +44,8 @@ function main() {
   const args = process.argv.slice(2);
   if (args.some((arg) => !['--dry-run', '--remove'].includes(arg))) throw new Error('usage: node scripts/setup-macos-task.mjs [--dry-run|--remove]');
   if (process.platform !== 'darwin') throw new Error('macos-only');
-  const plistPath = path.join(os.homedir(), 'Library', 'LaunchAgents', LABEL + '.plist');
+  const label = agentLabel();
+  const plistPath = path.join(os.homedir(), 'Library', 'LaunchAgents', label + '.plist');
   const domain = `gui/${process.getuid()}`;
   const remove = args.includes('--remove');
   const content = makePlist();
@@ -45,12 +53,12 @@ function main() {
     console.log(JSON.stringify({ ok: true, dryRun: true, remove, plistPath, domain, plist: remove ? undefined : content }, null, 2));
     return;
   }
-  applyAgent({ plistPath, domain, content, remove });
-  console.log(JSON.stringify({ ok: true, ...(remove ? { removed: true } : { label: LABEL, intervalSeconds: 21600 }), plistPath }));
+  applyAgent({ plistPath, domain, content, remove, label });
+  console.log(JSON.stringify({ ok: true, ...(remove ? { removed: true } : { label, intervalSeconds: 21600 }), plistPath }));
 }
 
-export function applyAgent({ plistPath, domain, content, remove = false, run = (file, args) => spawnSync(file, args, { encoding: 'utf8' }) }) {
-  const target = `${domain}/${LABEL}`;
+export function applyAgent({ plistPath, domain, content, label = LABEL, remove = false, run = (file, args) => spawnSync(file, args, { encoding: 'utf8' }) }) {
+  const target = `${domain}/${label}`;
   const probe = () => run('/bin/launchctl', ['print', target]);
   const initial = probe();
   if (initial.error) throw new Error('launchctl-unavailable');

@@ -78,7 +78,8 @@ node <插件目录>\scripts\install.mjs --verify
 
 `node scripts/setup-macos-task.mjs --dry-run` 先预览，安装使用相同命令去掉 `--dry-run`。
 只注册当前用户 LaunchAgent，每 6 小时检查；不使用 sudo。
-移除使用 `node scripts/setup-macos-task.mjs --remove`。卸载插件前单独移除任务。
+单独移除使用 `node scripts/setup-macos-task.mjs --remove`。
+Mac `install.mjs --uninstall` 默认会先移除对应任务；使用 `--no-task` 时跳过任务管理。
 
 ## 开发验证
 
@@ -86,8 +87,11 @@ node <插件目录>\scripts\install.mjs --verify
 测试不读取真实密码，不访问真实余额接口，不修改用户实际 profile。
 `npm run verify:macos` 用本机已安装 DSH CLI 创建隔离 Web profile，实际检查宿主加载、客户端资源和 200/401/403/405 路由响应，然后自动关闭测试实例。
 该脚本仅需要本机回环监听权限；不要为测试复制真实 DSH 凭据或访问真实余额。
+测试和隔离宿主安装必须加 `--no-task`，不得注册或覆盖真实登录项。
+`npm run verify:launchd` 使用独立临时名称和只写测试标记的脚本验证 launchd，结束后移除该任务；不运行真实续期入口。
+Mac 凭据状态仅调用原生助手 `status`，不使用 `read`；轮询期间等待窗口关闭后才进行登录，取消时保留原有凭据。
 用 `npm run build:macos` 编译 Swift 辅助程序，再运行 `.artifacts/macos-<架构>/credentials --check`；该检查不读取钥匙串。
-真实 DSH 设置页和账号登录需要另行验收，不能用 mock 通过替代。记录在 `docs/macos-validation.md`。
+真实 DSH 设置页和账号登录需要另行验收，不能用 mock 通过替代。当前记录在 `docs/macos-validation-0.16.1.md`，旧版本记录保留在 `docs/macos-validation.md`。
 
 ## 后台续期（可选）
 

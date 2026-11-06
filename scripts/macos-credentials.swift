@@ -21,6 +21,15 @@ func readCredentials() {
     FileHandle.standardOutput.write(data)
 }
 
+func credentialStatus() {
+    var lookup = query
+    lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+    lookup[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+    // No return-data/attributes flags: only test whether a matching item exists.
+    let saved = SecItemCopyMatching(lookup as CFDictionary, nil) == errSecSuccess
+    print(saved ? "{\"saved\":true}" : "{\"saved\":false}")
+}
+
 func storeCredentials() {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
@@ -42,13 +51,13 @@ func storeCredentials() {
     alert.accessoryView = view
     alert.window.initialFirstResponder = user
     app.activate(ignoringOtherApps: true)
-    guard alert.runModal() == .alertFirstButtonReturn else { return }
+    guard alert.runModal() == .alertFirstButtonReturn else { exit(2) }
     let username = user.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !username.isEmpty, !password.stringValue.isEmpty else {
         let error = NSAlert()
         error.messageText = "未保存：账号或密码为空"
         error.runModal()
-        return
+        exit(1)
     }
     guard let data = try? JSONSerialization.data(withJSONObject: ["username": username, "password": password.stringValue]) else { exit(1) }
     password.stringValue = ""
@@ -61,13 +70,14 @@ func storeCredentials() {
     }
     let notice = NSAlert()
     notice.messageText = status == errSecSuccess ? "已保存到本机钥匙串" : "未能保存到钥匙串（\(status)）"
-    notice.informativeText = status == errSecSuccess ? "返回 DSH，点击“立即刷新”。" : "请检查登录钥匙串是否已解锁后重试。"
+    notice.informativeText = status == errSecSuccess ? "关闭此提示后，DSH 将自动尝试登录。" : "请检查登录钥匙串是否已解锁后重试。"
     notice.runModal()
     if status != errSecSuccess { exit(1) }
 }
 
 switch CommandLine.arguments.dropFirst().first {
 case "read": readCredentials()
+case "status": credentialStatus()
 case "store": storeCredentials()
 case "--check": print("{\"ok\":true,\"backend\":\"macOS Keychain\"}")
 default: exit(2)

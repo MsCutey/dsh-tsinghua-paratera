@@ -1,12 +1,12 @@
 # dsh-paratera-balance
 
 DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力平台（easycompute）算力券余额**。
-版本 `0.5.0-macos.1`，增加 macOS 适配：Chrome 应用探测、钥匙串凭据窗口和可选 LaunchAgent。
-余额仍使用清华算力口径；Windows 继续使用 DPAPI。当前验证范围见 [Mac 验证记录](docs/macos-validation.md)。
+Mac 版本 `0.16.1-macos.1`，同步 Windows `0.16.1` 的控制台密钥管理、模型导入/设置、二次认证与兼容性诊断。
+Mac 使用原生钥匙串窗口，Windows 继续使用 DPAPI。当前验证范围见 [0.16.1 Mac 验证记录](docs/macos-validation-0.16.1.md)。
 
 ## Mac 安装
 
-前置：macOS、Google Chrome、Node 22+、已初始化的 DSH desktop profile。
+前置：macOS 13+、Google Chrome、Node 22+、已初始化的 DSH desktop profile。
 首次编译钥匙串辅助程序需要 Xcode Command Line Tools（`xcode-select --install`）。
 DSH 接口基线沿用上游要求 `0.2.1-rc.5+`；安装后的设置页与真实账号登录需在目标 DSH 中验收。
 
@@ -35,10 +35,12 @@ node scripts/install.mjs --verify
 安装器自动发现 DSH 的 pnpm，备份 profile 清单，再添加链接依赖与 bundle；重复安装不会重复追加。
 pnpm 失败会恢复清单备份，但不会回滚 pnpm 可能已产生的依赖目录变化，可修复错误后重试。
 `--dsh-home DIR` 和 `--profile NAME` 用于非默认 profile。
+安装默认注册当前用户的后台续期；如需沿用手动刷新的使用方式，使用 `node scripts/install.mjs --no-task`。
+自定义 `DSH_HOME` 使用独立 LaunchAgent 名称；后台任务失败会在 JSON 中标为 `ok: false`、`profileReady: true`，修复后可重跑安装。
 
 安装成功后，完全退出并重开 DSH，在「设置 → 清华算力余额」选择：
 
-- 「保存凭据」：在本机原生窗口输入账号密码，存到登录钥匙串中的 `DSH 清华算力余额` 项目；然后点「立即刷新」。后台读取不会弹出钥匙串解锁窗口，钥匙串锁定时需手动解锁或重新保存。
+- 「保存凭据」：在本机原生窗口输入账号密码，存到登录钥匙串中的 `DSH 清华算力余额` 项目；保存并关闭窗口后自动尝试登录，取消时保留原有凭据。状态轮询只检查钥匙串条目是否存在；实际登录时才读取密码。钥匙串锁定时需手动解锁或重新保存。
 - 「重新登录」：不保存密码，手动完成专用 Chrome 窗口中的登录；完成后返回 DSH 点「立即刷新」，窗口可以保持打开。验证码始终由用户处理。
 
 升级前已经打开的旧版专用 Chrome 需要先退出一次，再用「重新登录」打开新窗口。
@@ -49,7 +51,7 @@ Mac 的专用浏览器目录为 `~/Library/Application Support/DSH Paratera Bala
 不会使用日常 Chrome 的 profile。会话和状态位于 `$DSH_HOME`（默认 `~/.dsh`），文件权限为 `0600`。
 钥匙串辅助程序在插件的 `.artifacts/macos-<架构>/` 中编译；更新或重编译后如系统要求授权，需由用户在本机确认。
 
-可选后台续期（仅当前用户登录期间运行，每 6 小时检查；睡眠和退出登录期间不保证运行）：
+后台续期默认随安装注册（仅当前用户登录期间运行，每 6 小时检查；睡眠和退出登录期间不保证运行）。手动检查与注册：
 
 ```sh
 node scripts/setup-macos-task.mjs --dry-run
@@ -60,11 +62,11 @@ launchctl print "gui/$(id -u)/cn.edu.tsinghua.dsh-paratera-balance.refresh"
 卸载：
 
 ```sh
-node scripts/setup-macos-task.mjs --remove
 node scripts/install.mjs --uninstall
 ```
 
-不删除钥匙串项目、会话和浏览器 profile；需要时用户可自行在「钥匙串访问」中删除凭据。
+Mac 卸载默认先停止并移除对应 LaunchAgent，再移除插件。钥匙串项目、会话和浏览器 profile 保留；需要时用户可自行在「钥匙串访问」中删除凭据。
+后台续期遇到二次认证会结束本次任务并清理自己的等待浏览器；请回到 DSH 设置页完成认证。
 
 ## 数据来源
 
@@ -166,7 +168,7 @@ GET /paratera-balance/api/diagnostics
 # { plugin: { version }, host: { version, compatibility }, services: {...}, client: { ageMs } }
 ```
 
-设置页底部会显示「宿主 DSH 0.2.1-rc.5 · 插件 0.16.0 · 客户端已连接」；若宿主版本超出验证区间（当前 `>=0.2.0 <0.3.0`），这一行会变成橙色并注明未验证。`client.ageMs` 为空表示前端 bundle 没有加载起来——这正是升级后最常见的失效方式。
+设置页底部会显示宿主和当前插件版本，以及客户端连接状态；若宿主版本超出验证区间（当前 `>=0.2.0 <0.3.0`），这一行会变成橙色并注明未验证。`client.ageMs` 为空表示前端 bundle 没有加载起来。
 
 升级后建议跑一次 `node scripts/verify-host-sdk.mjs --electron '<DSH 可执行文件>'`，再用隔离宿主脚本验证客户端 bundle 与路由。
 
@@ -271,6 +273,7 @@ tests/            隔离测试及临时 Mac profile 的真实 pnpm 安装测试
 npm test                         # 不读取真实凭据，不请求真实余额
 npm run verify:macos              # 隔离启动已安装 DSH，验证真实宿主/客户端/鉴权后自动退出
 npm run verify:chrome             # 临时空白 Chrome：验证启动、复用及窗口关闭后的恢复
+npm run verify:launchd            # 独立临时后台任务：注册、运行、替换、移除，不使用账号
 EASYCOMPUTE_LIVE_TEST=1 node tests/live.mjs  # 用户明确授权后进行真实账号探测
 ```
 
@@ -283,6 +286,12 @@ npm run verify:host-sdk -- --electron "D:\DSH\DeepSeek Harness.exe"
 该检查使用 Electron 的 Node 模式，不启动另一个 GUI/服务器；只在随机临时目录写入假凭据，
 执行已安装宿主的凭据存储、Settings 修订号校验、配置验证及模型目录读取，并清理临时目录。
 没有提供 SDK 路径时，普通 `npm test` 会跳过此可选测试；不会把 mock 通过当作真实账号登录成功。
+
+Mac 对应命令：
+
+```sh
+npm run verify:host-sdk -- --electron "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness"
+```
 
 测试用 `--test-force-exit` 运行：插件按设计保留后台定时器，测试结束时不等事件循环清空。
 
