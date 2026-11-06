@@ -100,6 +100,19 @@ function fixture({ pages = [[makeRow({ uuid: 'selected-id', name: 'selected' })]
   return { events, deps, pages, context };
 }
 
+test('a page that lands off the console is re-authenticated once before giving up', async () => {
+  const { deps, context } = fixture();
+  const consoleOrigin = context.location.origin;
+  let calls = 0;
+  deps.authenticate = async () => {
+    calls += 1;
+    context.location.origin = calls === 1 ? 'https://sso.invalid' : consoleOrigin;
+    return { ok: true };
+  };
+  assert.deepEqual(await revealKeySecret({ uuid: 'selected-id', name: 'selected' }, deps), { ok: true, secret: SECRET });
+  assert.equal(calls, 2);
+});
+
 test('reveal uses one locked browser and finds a UUID outside the first table page', async () => {
   const other = makeRow({ uuid: 'other-id', name: 'other' });
   const selected = makeRow({ uuid: 'selected-id', name: 'selected' });
