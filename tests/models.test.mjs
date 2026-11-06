@@ -66,7 +66,8 @@ test('normalizeModel rejects unservable rows and fills missing fields', () => {
 test('reasoningEfforts is validated and preserved only when it offers a level', () => {
   const efforts = { off: null, low: 'low', medium: 'medium', high: 'high' };
   assert.deepEqual(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: efforts }).reasoningEfforts, efforts);
-  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: false }).reasoningEfforts, undefined);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: false }).reasoningEfforts, false);
+  assert.equal(normalizeModel({ id: 'Kimi-K3' }).reasoningEfforts, undefined);
   assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { off: null } }), null);
   assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { high: null } }), null);
   assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { bogus: 'x' } }), null);
