@@ -111,8 +111,23 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
     // SettingsForms.write/update and Entry._commitVolatile are installed code.
     // Only ConfigEditor.edit's persistence/reconciliation boundary is in-memory:
     // this does NOT claim to test full ConfigEditor/profile/HMR integration.
+    // describe() mirrors the real projection: `user` is the stored layer while
+    // `value` is the parsed config, where schemastery materialises dict/array
+    // defaults (modelOverrides:{} etc.) that a writer must not echo back.
+    const parsedProviders = (providers) => Object.fromEntries(Object.entries(structuredClone(providers)).map(([id, profile]) => [id, {
+      ...profile,
+      models: profile.models ?? [],
+      modelOverrides: profile.modelOverrides ?? {},
+      transport: profile.transport ?? 'auto',
+      defaultContextWindow: profile.defaultContextWindow ?? 128000,
+    }]));
     const settings = Object.assign(Object.create(SettingsForms.prototype), {
-      describe: () => [{ ns: 'llm-pi-ai', revision, value: structuredClone(raw) }],
+      describe: () => [{
+        ns: 'llm-pi-ai',
+        revision,
+        user: { providers: structuredClone(raw.providers) },
+        value: { providers: parsedProviders(raw.providers) },
+      }],
       ownerContext: { configEditor: {
         entries: () => [entry],
         async edit(actualEntry, transform) {

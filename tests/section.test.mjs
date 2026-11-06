@@ -576,6 +576,19 @@ test('model import starts empty, offers a select-all toggle, and caps explicit s
   f.dispose()
 })
 
+test('replace is opt-in and sends replaceModels with the explicit selection', async () => {
+  const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, modelsReplaced: true, modelsRemoved: 91, modelsAdded: ['model-a'] }) : undefined)
+  f.click('import'); f.click('all')
+  assert.equal(f.byKey('replace').props['aria-pressed'], false)
+  assert.match(text(f.byKey('replace')), /替换模式：关/)
+  f.click('replace')
+  assert.equal(f.byKey('replace').props['aria-pressed'], true)
+  await f.click('go')
+  assert.deepEqual(importRequests(f)[0].body, { uuid: 'uuid-one', models: ['model-a'], replaceModels: true })
+  assert.match(text(f.byKey('key-notice')), /已按本次选择替换 Paratera 模型列表，移除 91 个/)
+  f.dispose()
+})
+
 test('successful model registration points to the actual model list, not a paid subscription', async () => {
   const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, providerRegistered: true, modelsAvailable: true, modelsAdded: ['model-a'] }) : undefined)
   f.click('import'); f.click('all'); await f.click('go')

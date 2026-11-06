@@ -19,15 +19,37 @@ function settingsFixture(providers = {}) {
   const writes = [];
   let revision = 7;
   let current = structuredClone(providers);
+  const merge = (under, over) => {
+    if (!under || typeof under !== 'object' || Array.isArray(under) || !over || typeof over !== 'object' || Array.isArray(over)) return structuredClone(over);
+    const out = { ...under };
+    for (const [key, value] of Object.entries(over)) out[key] = key in out ? merge(out[key], value) : structuredClone(value);
+    return out;
+  };
+  // The live config is the parsed one: schemastery materialises dict/array
+  // defaults such as modelOverrides:{} and never stores them back.
+  const parsed = (value) => {
+    const copy = structuredClone(value);
+    for (const provider of Object.values(copy)) {
+      if (provider && typeof provider === 'object' && !Array.isArray(provider)) {
+        provider.modelOverrides ??= {};
+        provider.models ??= [];
+        provider.transport ??= 'auto';
+        provider.defaultContextWindow ??= 128000;
+      }
+    }
+    return copy;
+  };
   return {
     writes,
     get providers() { return current; },
-    describe() { return [{ ns: 'llm-pi-ai', revision, value: { providers: structuredClone(current) } }]; },
+    describe() {
+      return [{ ns: 'llm-pi-ai', revision, value: { providers: parsed(current) }, user: { providers: structuredClone(current) } }];
+    },
     async update(ns, patch, expected) {
       assert.equal(ns, 'llm-pi-ai');
       assert.equal(expected, revision);
       writes.push(structuredClone(patch));
-      current = { ...current, ...structuredClone(patch.providers) };
+      current = merge(current, structuredClone(patch.providers));
       revision += 1;
     },
   };
@@ -104,6 +126,37 @@ test('an existing key reference does not hide missing required route defaults', 
   assert.equal(settings.providers.paratera.baseURL, 'https://llmapi.paratera.com/v1');
 });
 
+test('a second import tolerates parsed schema defaults and never persists them', async () => {
+  // Regression: describe() materialises modelOverrides:{} and other defaults in
+  // the live value. Echoing that back made every import after the first fail
+  // with provider-config-invalid.
+  const settings = settingsFixture({ paratera: {
+    displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
+    apiKeyEnv: REF, models: [{ id: MODEL, name: MODEL, contextWindow: 128000, maxTokens: 8192 }],
+  } });
+  const result = await appendModels(['second-model'], { settings });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.added, ['second-model']);
+  assert.equal(settings.providers.paratera.modelOverrides, undefined);
+  assert.equal(Object.hasOwn(settings.writes[0].providers.paratera, 'modelOverrides'), false);
+  assert.equal(Object.hasOwn(settings.writes[0].providers.paratera, 'transport'), false);
+  assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), [MODEL, 'second-model']);
+});
+
+test('replace swaps the Paratera model list and reports what it removed', async () => {
+  const settings = settingsFixture({ paratera: {
+    displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
+    apiKeyEnv: REF, models: [{ id: 'keep' }, { id: 'drop' }],
+  } });
+  const result = await appendModels(['keep', 'new'], { settings, replace: true });
+  assert.equal(result.ok, true);
+  assert.equal(result.replaced, true);
+  assert.equal(result.removed, 1);
+  assert.deepEqual(result.added, ['new']);
+  assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), ['keep', 'new']);
+  assert.equal(settings.providers.paratera.models[0].name, undefined, 'kept entries keep their stored shape');
+});
+
 test('invalid model IDs are rejected rather than silently skipped', async () => {
   const settings = settingsFixture();
   for (const ids of [null, ['ok', 'bad\nmodel'], [{}], Array(201).fill('x')]) {
@@ -115,7 +168,7 @@ test('invalid model IDs are rejected rather than silently skipped', async () => 
 test('missing/invalid provider configuration and revision conflicts fail safely', async () => {
   assert.equal((await appendModels([MODEL])).error, 'settings-unavailable');
   assert.equal((await appendModels([MODEL], { settings: { describe: () => [], update() {} } })).error, 'provider-config-unavailable');
-  for (const provider of [{ models: 'bad' }, { models: [{}] }, { modelOverrides: {} }, 'bad']) {
+  for (const provider of [{ models: 'bad' }, { models: [{}] }, 'bad']) {
     const settings = settingsFixture({ paratera: provider });
     assert.equal((await appendModels([MODEL], { settings })).error, 'provider-config-invalid');
     assert.equal(settings.writes.length, 0);
