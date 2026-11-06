@@ -164,17 +164,17 @@ test('a user-chosen model name is never overwritten by the importer', async () =
   assert.equal(settings.providers.paratera.models[1].name, 'Qwen3.8-Max');
 });
 
-test('replace swaps the Paratera model list and reports what it removed', async () => {
+test('imports only ever append: existing entries survive untouched', async () => {
   const settings = settingsFixture({ paratera: {
     displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
     apiKeyEnv: REF, models: [{ id: 'keep' }, { id: 'drop' }],
   } });
-  const result = await appendModels(['keep', 'new'], { settings, replace: true });
+  const result = await appendModels(['keep', 'new'], { settings });
   assert.equal(result.ok, true);
-  assert.equal(result.replaced, true);
-  assert.equal(result.removed, 1);
+  assert.equal(result.replaced, false);
+  assert.equal(result.removed, 0);
   assert.deepEqual(result.added, ['new']);
-  assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), ['keep', 'new']);
+  assert.deepEqual(settings.providers.paratera.models.map((model) => model.id), ['keep', 'drop', 'new']);
   assert.equal(settings.providers.paratera.models[0].name, undefined, 'kept entries keep their stored shape');
 });
 

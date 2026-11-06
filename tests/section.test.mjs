@@ -580,16 +580,12 @@ test('model import starts empty, offers a select-all toggle, and caps explicit s
   f.dispose()
 })
 
-test('replace is opt-in and sends replaceModels with the explicit selection', async () => {
-  const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, modelsReplaced: true, modelsRemoved: 91, modelsAdded: ['model-a'] }) : undefined)
+test('import picker appends and no longer offers a replace mode', async () => {
+  const f = await loaded((r) => r.url.endsWith('/keys/import') ? response({ ok: true, credentialImported: true, modelsAdded: ['model-a'] }) : undefined)
   f.click('import'); f.click('all')
-  assert.equal(f.byKey('replace').props['aria-pressed'], false)
-  assert.match(text(f.byKey('replace')), /替换模式：关/)
-  f.click('replace')
-  assert.equal(f.byKey('replace').props['aria-pressed'], true)
+  assert.doesNotMatch(f.text(), /替换模式/)
   await f.click('go')
-  assert.deepEqual(importRequests(f)[0].body, { uuid: 'uuid-one', models: ['model-a'], replaceModels: true })
-  assert.match(text(f.byKey('key-notice')), /已按本次选择替换 Paratera 模型列表，移除 91 个/)
+  assert.deepEqual(importRequests(f)[0].body, { uuid: 'uuid-one', models: ['model-a'] })
   f.dispose()
 })
 
@@ -843,18 +839,28 @@ test('模型设置 loads the host list, edits fields and saves the exact model l
   f.dispose()
 })
 
-test('思考挡位 is one control: unchecked means follow the model, checked writes levels', async () => {
+test('思考挡位 is one control: unchecked means follow the model, first tick seeds low/high/max', async () => {
   const f = modelsFixture()
   await tick()
   assert.equal(f.find((n) => n.props['data-field'] === 'reasoning-mode'), undefined)
   assert.match(f.text(), /未勾选＝跟随模型原生/)
   assert.equal(f.find((n) => n.props['data-field'] === 'level-low').props.checked, false)
   f.find((n) => n.props['data-field'] === 'level-max').props.onChange()
-  assert.equal(f.find((n) => n.props['data-field'] === 'level-max').props.checked, true)
+  for (const level of ['low', 'high', 'max']) assert.equal(f.find((n) => n.props['data-field'] === 'level-' + level).props.checked, true)
   assert.match(f.text(), /自定义挡位/)
   await f.click('save-models')
   const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
-  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, max: 'max' })
+  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max' })
+  f.dispose()
+})
+
+test('first tick on a middle level keeps the trio and adds it', async () => {
+  const f = modelsFixture()
+  await tick()
+  f.find((n) => n.props['data-field'] === 'level-medium').props.onChange()
+  await f.click('save-models')
+  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max', medium: 'medium' })
   f.dispose()
 })
 

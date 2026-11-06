@@ -62,6 +62,7 @@ function fixture({ pages = [[makeRow({ uuid: 'selected-id', name: 'selected' })]
     click() { events.push('first'); go(0); },
   };
   const document = {
+    readyState: 'complete',
     querySelectorAll(selector) {
       if (selector === '.ant-table-tbody tr') return pages[page];
       if (selector === '.ant-table-thead th') return headers.map((innerText) => ({ innerText }));
