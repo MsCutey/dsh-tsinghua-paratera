@@ -118,16 +118,18 @@ Windows 密码以 DPAPI 加密保存在本机（仅当前 Windows 账户可解�
 API 密钥不是付费订阅，本插件不会创建“Codex 订阅”等其他插件的独立页面。
 
 导入时按平台模型广场的「上下文长度」写入上下文窗口（内置 `lib/model-catalog.mjs`，80 个对话/多模态模型），
-视觉模型按广场标签与简介自动勾选「图片」输入；最大输出默认 8192，名称直接使用模型 ID，不再带「待校准」。
+视觉模型按广场标签与简介自动勾选「图片」输入；名称直接使用模型 ID，不再带「待校准」。
+最大输出默认取宿主 pi-ai 的上限 32768（上下文较小的模型取窗口一半），平台没有公布各模型输出上限，可在「模型设置」统一或逐个调整。
 控制台可授权的模型未必都在公网 `/v1/models` 中（例如已下线的 ERNIE、Qwen3-Max），这类模型会被跳过并在提示里给出数量，不再让整次导入失败。
-平台没有公布每个模型的最大输出 token，该值可在「模型设置」里调整；上下文长度可用 `node scripts/scan-model-catalog.mjs` 重新抓取。
+上下文长度可用 `node scripts/scan-model-catalog.mjs` 重新抓取。
 
 ## 模型设置
 
 「清华算力余额」页内有两个页签：「账号登录」和「模型设置」，不额外占用设置菜单。
 「模型设置」列出已导入的 Paratera 模型，可逐项调整名称、上下文窗口、最大输出、输入类型（文本/图片）和思考强度
-（开启后写入 `reasoningEfforts: { off: null, low/medium/high }`，可在输入栏模型选择器里切换等级）。
-支持「恢复推荐值」「删除」和整体保存。保存走宿主修订号 Settings 接口，只替换 `llm-pi-ai.providers.paratera.models`，
+（开启后写入模型原生的 `reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' }`，可在输入栏切换 Off / Low / High / Max）。
+另有「统一最大输出」可一次套用到全部模型。支持「恢复推荐值」「删除」和整体保存。
+保存走宿主修订号 Settings 接口，只替换 `llm-pi-ai.providers.paratera.models`，
 不会请求平台、不会重新读取密钥，也不会把 `modelOverrides: {}` 等解析默认值写回 profile。
 
 「改名」「新建」「删除」均在插件页面内填写/确认，不依赖 Electron 不支持的 `window.prompt()`。

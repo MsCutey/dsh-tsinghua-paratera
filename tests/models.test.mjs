@@ -2,7 +2,7 @@ import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import fs from 'node:fs';
-import { recommendedModel, supportsReasoning, isVisionModel, normalizeModel, validateModels, readModels, writeModels } from '../lib/models.mjs';
+import { recommendedModel, recommendedMaxTokens, thinkingEfforts, supportsReasoning, isVisionModel, normalizeModel, validateModels, readModels, writeModels } from '../lib/models.mjs';
 import { createPlugin } from '../lib/index.js';
 
 const ROUTE = '/paratera-balance/api/models';
@@ -32,7 +32,11 @@ function settingsFixture() {
 }
 
 test('recommendations come from the captured platform catalog', () => {
-  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 1024000, maxTokens: 8192, input: ['text', 'image'] });
+  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 1024000, maxTokens: 32768, input: ['text', 'image'] });
+  assert.equal(recommendedMaxTokens(1024000), 32768);
+  assert.equal(recommendedMaxTokens(8192), 4096);
+  assert.equal(recommendedModel('GLM-4V').maxTokens, 4096);
+  assert.deepEqual(thinkingEfforts(), { off: null, low: 'low', high: 'high', max: 'max' });
   assert.equal(recommendedModel('Kimi-K3').contextWindow, 1024000);
   assert.equal(recommendedModel('MiniMax-M1-80k').contextWindow, 10240000);
   assert.equal(recommendedModel('Qwen-Long').contextWindow, 10240000);
@@ -117,7 +121,7 @@ test('writeModels fills route defaults when the provider does not exist yet', as
   assert.equal(result.ok, true);
   assert.deepEqual(writes[0].providers.paratera, {
     displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
-    apiKeyEnv: 'PARATERA_API_KEY', models: [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 8192, input: ['text', 'image'] }],
+    apiKeyEnv: 'PARATERA_API_KEY', models: [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 32768, input: ['text', 'image'] }],
   });
 });
 
