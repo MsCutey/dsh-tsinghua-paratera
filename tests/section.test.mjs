@@ -61,11 +61,12 @@ function fixture(handler = () => undefined, options = {}) {
       return response({ ok: true })
     },
   })
-  entry.factory(() => React).apply({ slots: {
+  const plugin = entry.factory(() => React)
+  plugin.apply({ slots: {
     inject: (_, fn) => fn(),
     register: (spec, value) => { if (spec.name === 'settings.section') sections.set(spec.id, value) },
   } })
-  component = sections.get(options.section === 'models' ? 'paratera-models' : 'paratera-balance')
+  component = options.component === 'models' ? plugin.components.ModelsPanel : sections.get('paratera-balance')
   const fixture = {
     requests, intervals, timers, sections,
     section(id) { return sections.get(id) },
@@ -803,12 +804,27 @@ const modelRow = (overrides = {}) => ({
 })
 
 function modelsFixture(handler) {
-  return fixture((r) => {
+  return fixture(handler ?? ((r) => {
     if (r.url !== '/paratera-balance/api/models') return response({ ok: true })
     if (r.options.method === 'POST') return response({ ok: true, revision: 9, models: r.body.models })
     return response({ ok: true, revision: 8, models: [modelRow()] })
-  }, { section: 'models' })
+  }), { component: 'models' })
 }
+
+test('the plugin page registers one section whose second tab mounts the models panel', async () => {
+  const f = fixture()
+  assert.deepEqual([...f.sections.keys()], ['paratera-balance'])
+  assert.equal(f.byKey('tab-account').props['aria-selected'], true)
+  assert.equal(f.byKey('tab-models').props['aria-selected'], false)
+  assert.equal(walk(f.render()).some((n) => typeof n.tag === 'function'), false)
+  f.click('tab-models')
+  assert.equal(f.byKey('tab-models').props['aria-selected'], true)
+  assert.equal(walk(f.render()).some((n) => typeof n.tag === 'function'), true)
+  f.click('tab-account')
+  assert.equal(f.byKey('tab-account').props['aria-selected'], true)
+  assert.equal(walk(f.render()).some((n) => typeof n.tag === 'function'), false)
+  f.dispose()
+})
 
 test('模型设置 loads the host list, edits fields and saves the exact model list', async () => {
   const f = modelsFixture()
@@ -824,6 +840,19 @@ test('模型设置 loads the host list, edits fields and saves the exact model l
   assert.deepEqual(posts[0].body.models, [{ id: 'Kimi-K3', name: 'Kimi K3', contextWindow: 200000, maxTokens: 8192, input: ['text', 'image'] }])
   assert.equal(posts[0].body.revision, 8)
   assert.match(f.text(), /已保存 1 个模型设置/)
+  f.dispose()
+})
+
+test('模型设置 toggles thinking levels and saves reasoningEfforts', async () => {
+  const f = modelsFixture()
+  await tick()
+  assert.match(f.text(), /思考强度/)
+  assert.match(f.text(), /关闭/)
+  f.find((n) => n.props['data-field'] === 'reasoning').props.onChange()
+  assert.match(f.text(), /已开启/)
+  await f.click('save-models')
+  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', medium: 'medium', high: 'high' })
   f.dispose()
 })
 
@@ -846,7 +875,7 @@ test('模型设置 rejects invalid edits before the POST and can reset or delete
 })
 
 test('模型设置 shows a friendly error when the host has no Settings service', async () => {
-  const f = fixture((r) => r.url === '/paratera-balance/api/models' ? response({ ok: false, error: 'settings-unavailable' }) : response({ ok: true }), { section: 'models' })
+  const f = modelsFixture((r) => r.url === '/paratera-balance/api/models' ? response({ ok: false, error: 'settings-unavailable' }) : response({ ok: true }))
   await tick()
   assert.match(f.text(), /宿主模型设置服务暂不可用/)
   assert.equal(f.byKey('save-models').props.disabled, true)

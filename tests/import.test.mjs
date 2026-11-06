@@ -151,7 +151,7 @@ test('legacy 待校准 entries are upgraded to the recommended name and values',
   const result = await appendModels(['Kimi-K3'], { settings });
   assert.equal(result.ok, true);
   assert.equal(result.updated, true);
-  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'] }]);
+  assert.deepEqual(settings.providers.paratera.models, [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 8192, input: ['text', 'image'] }]);
 });
 
 test('a user-chosen model name is never overwritten by the importer', async () => {
@@ -242,6 +242,24 @@ test('key-only and dry-run imports do not modify model settings', async () => {
   assert.deepEqual(f.settings.writes, []);
   assertNoSecrets(preview);
   assert.equal((await importKey({ name: 'DSH' }, f.dependencies)).ok, true);
+  assert.deepEqual(f.settings.writes, []);
+});
+
+test('models the gateway no longer lists are skipped instead of failing the whole import', async () => {
+  const f = importFixture({ verify: async () => ({ ok: true, models: 1, modelIds: [MODEL] }) });
+  const result = await importKey({ uuid: 'uuid-1', models: [MODEL, 'retired-model'] }, f.dependencies);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.modelsSkipped, ['retired-model']);
+  assert.deepEqual(result.modelsAdded, [MODEL]);
+  assert.deepEqual(f.settings.providers.paratera.models.map((model) => model.id), [MODEL]);
+  assertNoSecrets(result);
+});
+
+test('a selection with no served models still fails instead of writing an empty route', async () => {
+  const f = importFixture({ verify: async () => ({ ok: true, models: 1, modelIds: [MODEL] }) });
+  const result = await importKey({ uuid: 'uuid-1', models: ['retired-model'] }, f.dependencies);
+  assert.equal(result.error, 'model-not-available');
+  assert.deepEqual(f.writes, []);
   assert.deepEqual(f.settings.writes, []);
 });
 

@@ -2,7 +2,7 @@ import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import fs from 'node:fs';
-import { recommendedModel, isVisionModel, normalizeModel, validateModels, readModels, writeModels } from '../lib/models.mjs';
+import { recommendedModel, supportsReasoning, isVisionModel, normalizeModel, validateModels, readModels, writeModels } from '../lib/models.mjs';
 import { createPlugin } from '../lib/index.js';
 
 const ROUTE = '/paratera-balance/api/models';
@@ -31,16 +31,19 @@ function settingsFixture() {
   };
 }
 
-test('recommendations come from family names but stay editable defaults', () => {
-  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 131072, maxTokens: 8192, input: ['text'] });
-  assert.equal(recommendedModel('Kimi-K3').contextWindow, 262144);
-  assert.equal(recommendedModel('MiniMax-M1-80k').contextWindow, 81920);
-  assert.equal(recommendedModel('Qwen-Long').contextWindow, 1048576);
+test('recommendations come from the captured platform catalog', () => {
+  assert.deepEqual(recommendedModel('DeepSeek-V4.1-Flash-1017'), { id: 'DeepSeek-V4.1-Flash-1017', name: 'DeepSeek-V4.1-Flash-1017', contextWindow: 1024000, maxTokens: 8192, input: ['text', 'image'] });
+  assert.equal(recommendedModel('Kimi-K3').contextWindow, 1024000);
+  assert.equal(recommendedModel('MiniMax-M1-80k').contextWindow, 10240000);
+  assert.equal(recommendedModel('Qwen-Long').contextWindow, 10240000);
+  assert.equal(recommendedModel('GLM-4.6').contextWindow, 204800);
   assert.deepEqual(recommendedModel('GLM-4.5V').input, ['text', 'image']);
   assert.deepEqual(recommendedModel('DeepSeek-V4-Flash-Vision-Exp').input, ['text', 'image']);
+  assert.deepEqual(recommendedModel('GLM-4.6').input, ['text']);
   assert.equal(isVisionModel('PaddleOCR-VL-1.5'), true);
   assert.equal(isVisionModel('GLM-4.6'), false);
-  assert.equal('待校准' in recommendedModel('Kimi-K3'), false);
+  assert.equal(supportsReasoning('DeepSeek-V4.1-Flash-1017'), true);
+  assert.equal(supportsReasoning('GLM-4.6'), false);
   assert.doesNotMatch(recommendedModel('Kimi-K3').name, /待校准/);
 });
 
@@ -49,9 +52,20 @@ test('normalizeModel rejects unservable rows and fills missing fields', () => {
   assert.equal(normalizeModel({ id: 'bad\nmodel' }), null);
   assert.deepEqual(normalizeModel({ id: 'Kimi-K3' }), recommendedModel('Kimi-K3'));
   assert.equal(normalizeModel({ id: 'Kimi-K3', name: '   ' }).name, 'Kimi-K3');
-  assert.equal(normalizeModel({ id: 'Kimi-K3', contextWindow: 0 }).contextWindow, 262144);
-  assert.deepEqual(normalizeModel({ id: 'Kimi-K3', input: ['audio'] }).input, ['text']);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', contextWindow: 0 }).contextWindow, 1024000);
+  assert.deepEqual(normalizeModel({ id: 'Kimi-K3', input: ['audio'] }).input, recommendedModel('Kimi-K3').input);
   assert.deepEqual(normalizeModel({ id: 'Kimi-K3', input: ['image'] }).input, ['text', 'image']);
+});
+
+test('reasoningEfforts is validated and preserved only when it offers a level', () => {
+  const efforts = { off: null, low: 'low', medium: 'medium', high: 'high' };
+  assert.deepEqual(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: efforts }).reasoningEfforts, efforts);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: false }).reasoningEfforts, undefined);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { off: null } }), null);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { high: null } }), null);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: { bogus: 'x' } }), null);
+  assert.equal(normalizeModel({ id: 'Kimi-K3', reasoningEfforts: 'high' }), null);
+  assert.deepEqual(validateModels([{ id: 'a', reasoningEfforts: { low: 'low' } }]).models[0].reasoningEfforts, { low: 'low' });
 });
 
 test('validateModels rejects duplicates, oversize and invalid ids before any write', () => {
@@ -68,7 +82,7 @@ test('readModels exposes the stored list with its recommendation and revision', 
   assert.equal(result.revision, 4);
   assert.equal(result.models[0].id, 'Kimi-K3');
   assert.equal(result.models[0].contextWindow, 262144);
-  assert.equal(result.models[0].recommended.contextWindow, 262144);
+  assert.equal(result.models[0].recommended.contextWindow, 1024000);
   assert.equal(result.provider.displayName, 'Paratera');
 });
 
@@ -103,7 +117,7 @@ test('writeModels fills route defaults when the provider does not exist yet', as
   assert.equal(result.ok, true);
   assert.deepEqual(writes[0].providers.paratera, {
     displayName: 'Paratera', api: 'openai-completions', baseURL: 'https://llmapi.paratera.com/v1',
-    apiKeyEnv: 'PARATERA_API_KEY', models: [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 262144, maxTokens: 8192, input: ['text'] }],
+    apiKeyEnv: 'PARATERA_API_KEY', models: [{ id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 8192, input: ['text', 'image'] }],
   });
 });
 
