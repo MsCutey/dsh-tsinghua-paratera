@@ -803,11 +803,11 @@ const modelRow = (overrides = {}) => ({
   ...overrides,
 })
 
-function modelsFixture(handler) {
+function modelsFixture(handler, options = {}) {
   return fixture(handler ?? ((r) => {
     if (r.url !== '/paratera-balance/api/models') return response({ ok: true })
     if (r.options.method === 'POST') return response({ ok: true, revision: 9, models: r.body.models })
-    return response({ ok: true, revision: 8, models: [modelRow()] })
+    return response({ ok: true, revision: 8, models: options.rows ?? [modelRow()] })
   }), { component: 'models' })
 }
 
@@ -843,45 +843,36 @@ test('模型设置 loads the host list, edits fields and saves the exact model l
   f.dispose()
 })
 
-test('思考模式 has three explicit states and never means "default levels"', async () => {
+test('思考挡位 is one control: unchecked means follow the model, checked writes levels', async () => {
   const f = modelsFixture()
   await tick()
-  const mode = () => f.find((n) => n.props['data-field'] === 'reasoning-mode')
-  assert.equal(mode().props.value, 'native')
-  assert.match(text(mode()), /跟随模型原生/)
-  assert.match(text(mode()), /开启思考（自定义挡位）/)
-  assert.match(text(mode()), /关闭思考/)
-  assert.equal(f.find((n) => n.props['data-field'] === 'level-low'), undefined)
-  mode().props.onChange({ target: { value: 'custom' } })
-  assert.equal(mode().props.value, 'custom')
-  assert.match(f.text(), /low/)
-  assert.match(f.text(), /max/)
+  assert.equal(f.find((n) => n.props['data-field'] === 'reasoning-mode'), undefined)
+  assert.match(f.text(), /未勾选＝跟随模型原生/)
+  assert.equal(f.find((n) => n.props['data-field'] === 'level-low').props.checked, false)
+  f.find((n) => n.props['data-field'] === 'level-max').props.onChange()
+  assert.equal(f.find((n) => n.props['data-field'] === 'level-max').props.checked, true)
+  assert.match(f.text(), /自定义挡位/)
   await f.click('save-models')
-  let post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
-  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max' })
+  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, max: 'max' })
   f.dispose()
 })
 
-test('关闭思考 writes the explicit false declaration, 跟随模型原生 omits it', async () => {
-  const off = modelsFixture()
+test('clearing every thinking level returns to following the model', async () => {
+  const f = modelsFixture(undefined, { rows: [modelRow({ reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' } })] })
   await tick()
-  off.find((n) => n.props['data-field'] === 'reasoning-mode').props.onChange({ target: { value: 'off' } })
-  await off.click('save-models')
-  const offPost = off.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
-  assert.equal(offPost.body.models[0].reasoningEfforts, false)
-  off.dispose()
-  const native = modelsFixture()
-  await tick()
-  await native.click('save-models')
-  const nativePost = native.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
-  assert.equal(nativePost.body.models[0].reasoningEfforts, undefined)
-  native.dispose()
+  assert.match(f.text(), /自定义挡位/)
+  for (const level of ['low', 'high', 'max']) f.find((n) => n.props['data-field'] === 'level-' + level).props.onChange()
+  assert.match(f.text(), /未勾选＝跟随模型原生/)
+  await f.click('save-models')
+  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  assert.equal(post.body.models[0].reasoningEfforts, undefined)
+  f.dispose()
 })
 
 test('模型设置 edits the offered levels one by one', async () => {
-  const f = modelsFixture()
+  const f = modelsFixture(undefined, { rows: [modelRow({ reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' } })] })
   await tick()
-  f.find((n) => n.props['data-field'] === 'reasoning-mode').props.onChange({ target: { value: 'custom' } })
   f.find((n) => n.props['data-field'] === 'level-medium').props.onChange()
   assert.equal(f.find((n) => n.props['data-field'] === 'level-medium').props.checked, true)
   f.find((n) => n.props['data-field'] === 'level-low').props.onChange()
@@ -889,18 +880,6 @@ test('模型设置 edits the offered levels one by one', async () => {
   await f.click('save-models')
   const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
   assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, medium: 'medium', high: 'high', max: 'max' })
-  f.dispose()
-})
-
-test('removing the last thinking level switches the model to 关闭思考', async () => {
-  const f = modelsFixture()
-  await tick()
-  f.find((n) => n.props['data-field'] === 'reasoning-mode').props.onChange({ target: { value: 'custom' } })
-  for (const level of ['low', 'high', 'max']) f.find((n) => n.props['data-field'] === 'level-' + level).props.onChange()
-  assert.equal(f.find((n) => n.props['data-field'] === 'reasoning-mode').props.value, 'off')
-  await f.click('save-models')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
-  assert.equal(post.body.models[0].reasoningEfforts, false)
   f.dispose()
 })
 
