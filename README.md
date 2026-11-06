@@ -108,6 +108,28 @@ Windows 密码以 DPAPI 加密保存在本机（仅当前 Windows 账户可解�
 - 「重新登录」：打开专用浏览器窗口，手动走一次清华 SSO（验证码或改密后使用）
 - 「保存凭据」：打开本机凭据对话框，更新账号密码（Windows DPAPI / macOS 钥匙串）
 
+## API 密钥与模型导入
+
+在「清华算力余额」页完成清华登录后，依次选择「连接控制台」→「加载密钥」→ 对应密钥的「导入」。
+主按钮「导入并添加到模型列表」会保存密钥并添加所选模型，成功后在「模型 → Paratera」及聊天模型选择器中查看。
+已知模型默认勾选前 200 个；列表为空时，从验证接口自动发现模型再添加（超过 200 个需先明确选择）。
+次按钮「仅保存密钥（不添加模型）」不会创建模型供应商条目，不能用它判断模型导入成功；禁用密钥需先启用。
+API 密钥不是付费订阅，本插件不会创建“Codex 订阅”等其他插件的独立页面。
+
+「改名」「新建」「删除」均在插件页面内填写/确认，不依赖 Electron 不支持的 `window.prompt()`。
+改名后点击「保存名称」或在表单内按回车；失败时保留输入并显示局部错误，不再静默无效。
+
+- 按 UUID 选择密钥；跨页查找不会用名称子串误选。同名且页面无法提供可靠身份时会拒绝读取，先在控制台重命名后重试。
+- 完整密钥只在宿主中验证、写入，不返回设置页。验证仅请求模型列表，不发起计费的模型推理。
+- 写入 `PARATERA_API_KEY` 前先备份旧值到 `PARATERA_API_KEY_BACKUP`；读取或备份失败时不覆盖旧值。
+- 选中的模型必须出现在密钥验证返回的可用列表中。模型写入使用 DSH 的修订号 Settings 接口，仅更新当前 profile 的 `llm-pi-ai.providers.paratera`，保留其他供应商及已有模型元数据；不会修改遇到的第一个 `models:` 文本块。
+- 缺失的 Paratera 路由会补齐 OpenAI-compatible 协议和官方 API 地址。新模型的默认容量为 128000 / 8192，名称带「待校准」，应按平台实际限制调整；不代表已验证推理能力。
+- 模型配置通过宿主即时更新。若提示「密钥已保存，但模型导入失败」，密钥部分已经完成，可修复模型配置后重试；不会笼统报告全部成功。
+- 浏览器认证可能较慢；连接控制台最多等待 4 分钟、导入最多等待 5 分钟。页面超时/关闭**不保证取消宿主已开始的写入**，请先确认状态，不要立即重复导入。
+
+更新插件代码后仍须从托盘完全退出并重启 DSH；上述即时更新指模型配置，不是插件代码热替换。
+当前自动化验证使用隔离数据与已安装宿主 SDK；真实账号的控制台页面和导入结果仍需用户在重启后验收。
+
 ## 宿主路由
 
 ```
@@ -116,10 +138,21 @@ GET  /paratera-balance/api/status
 POST /paratera-balance/api/refresh
 POST /paratera-balance/api/login
 POST /paratera-balance/api/credentials
+GET  /paratera-balance/api/console/status
+POST /paratera-balance/api/console/connect
+GET  /paratera-balance/api/keys
+POST /paratera-balance/api/keys/create
+POST /paratera-balance/api/keys/update
+POST /paratera-balance/api/keys/delete
+POST /paratera-balance/api/keys/import
+POST /paratera-balance/api/keys/refresh-models
 ```
 
-全部先过 `connection.requestRejection`；token 只在宿主进程内使用，不下发浏览器；
-请求仅发往 `easycompute.cs.tsinghua.edu.cn`，禁止重定向。
+全部先过 `connection.requestRejection`；token 和完整 API 密钥只在宿主进程内使用，不下发浏览器。
+余额请求发往 `easycompute.cs.tsinghua.edu.cn`，控制台请求发往 `ai.paratera.com`，
+密钥验证请求发往 `llmapi.paratera.com`；宿主 HTTP 请求禁止携带凭据跟随重定向。
+导入接口接受 `uuid`（优先）或兼容的 `name`，可选 `models: string[]` 和 `dryRun: true`。
+`dryRun` 仍会读取并验证所选密钥，但不写入凭据或模型配置；它不是匿名探测接口。
 
 ## 配置
 
@@ -196,6 +229,16 @@ npm run verify:macos              # 隔离启动已安装 DSH，验证真实宿�
 npm run verify:chrome             # 临时空白 Chrome：验证启动、复用及窗口关闭后的恢复
 EASYCOMPUTE_LIVE_TEST=1 node tests/live.mjs  # 用户明确授权后进行真实账号探测
 ```
+
+在源码仓库的 Windows 环境中，可额外运行已安装 SDK 契约测试（按实际安装位置替换可执行文件）：
+
+```powershell
+npm run verify:host-sdk -- --electron "D:\DSH\DeepSeek Harness.exe"
+```
+
+该检查使用 Electron 的 Node 模式，不启动另一个 GUI/服务器；只在随机临时目录写入假凭据，
+执行已安装宿主的凭据存储、Settings 修订号校验、配置验证及模型目录读取，并清理临时目录。
+没有提供 SDK 路径时，普通 `npm test` 会跳过此可选测试；不会把 mock 通过当作真实账号登录成功。
 
 测试用 `--test-force-exit` 运行：插件按设计保留后台定时器，测试结束时不等事件循环清空。
 

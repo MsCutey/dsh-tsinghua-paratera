@@ -1,12 +1,13 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
     "install:dsh": "node scripts/install.mjs",
     "verify:dsh": "node scripts/install.mjs --verify",
     "verify:macos": "node scripts/verify-dsh-macos.mjs",
     "verify:chrome": "node scripts/verify-chrome-macos.mjs",
+    "verify:host-sdk": "node scripts/verify-host-sdk.mjs",
     "task:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1",
     "task:macos": "node scripts/setup-macos-task.mjs",
     "build:macos": "node --input-type=module -e \"import {buildCredentialHelper} from './lib/macos-credentials.mjs'; console.log(await buildCredentialHelper())\""
