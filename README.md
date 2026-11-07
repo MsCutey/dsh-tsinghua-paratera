@@ -3,7 +3,7 @@
 DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
 登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
-当前版本：**1.0.3**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+当前版本：**1.0.4**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
 
 > **适用范围**：仅适用于通过 `id.tsinghua.edu.cn` 登录的清华算力平台账号（`easycompute.cs.tsinghua.edu.cn`）。
 > Paratera 官方账号或其他高校、企业的 Paratera 接入**不在支持范围**，登录步骤无法通过。

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- 修复 1.0.3 在 Windows 上失败的路径断言：`pluginDataPaths` 对 macOS 用 POSIX 分隔符、对 Windows 用反斜杠，测试不再受运行主机影响。产品行为不变。
+
 ## 1.0.3
 
 - 卸载现在会清理插件写入的配置：移除 `cordis.patch.yml` 中 `paratera` provider 与指向它的默认模型条目（带备份），并删除会话/状态文件；`--keep-data` 可保留，`--purge-profile` 额外删除专用 Chrome profile。
