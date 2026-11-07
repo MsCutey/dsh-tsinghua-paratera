@@ -21,7 +21,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = path.resolve(HERE, '..');
 
 export function parseArgs(argv) {
-  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, task: false, taskExplicit: false, json: false };
+  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, task: false, taskExplicit: false, json: false, keepData: false, purgeProfile: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--profile' || arg === '--dsh-home') {
@@ -39,6 +39,8 @@ export function parseArgs(argv) {
     else if (arg === '--task') { options.task = true; options.taskExplicit = true; }
     else if (arg === '--no-task') { options.task = false; options.taskExplicit = true; }
     else if (arg === '--json') options.json = true;
+    else if (arg === '--keep-data') options.keepData = true;
+    else if (arg === '--purge-profile') options.purgeProfile = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else throw new Error('unknown option: ' + arg);
   }
@@ -76,6 +78,78 @@ export function planManifest(manifest, pluginDir, { uninstall = false } = {}) {
     hadBundle,
     link,
   };
+}
+
+/** Data the plugin created outside the profile manifest (models, sessions, profile). */
+export function pluginDataPaths(dshHome, platform = process.platform, home = os.homedir(), env = process.env) {
+  const join = platform === 'win32' ? path.win32.join : path.join;
+  return {
+    sessionFiles: [
+      join(dshHome, 'easycompute-session.json'),
+      join(dshHome, 'easycompute-state.json'),
+      join(dshHome, 'paratera-console-session.json'),
+      join(dshHome, 'easycompute-refresh.lock'),
+    ],
+    chromeProfile: platform === 'darwin'
+      ? join(home, 'Library', 'Application Support', 'DSH Tsinghua Paratera')
+      : join(env.LOCALAPPDATA || join(home, 'AppData', 'Local'), 'dsh-tsinghua-paratera-profile'),
+  };
+}
+
+/**
+ * Remove the Paratera provider (and a default-model pointer to it) from the
+ * profile's cordis.patch.yml without reformatting unrelated entries.
+ * Returns the next text plus what would change; callers write with a backup.
+ */
+export function planPatchCleanup(text) {
+  if (typeof text !== 'string') return { text, changed: false, removedProvider: false, removedDefault: false };
+  const lines = text.split('\n');
+  const indentOf = (line) => (line.match(/^ */) || [''])[0].length;
+  // Patch entries are top-level list items; nested "- id:" keys (model rows) are not entries.
+  const isEntryStart = (line) => /^-\s+id:/.test(line);
+  const blocks = [];
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (isEntryStart(lines[i])) {
+      if (start !== -1) blocks.push([start, i]);
+      start = i;
+    }
+  }
+  if (start !== -1) blocks.push([start, lines.length]);
+
+  const drop = new Set();
+  let removedProvider = false;
+  let removedDefault = false;
+  for (const [from, to] of blocks) {
+    const block = lines.slice(from, to);
+    const id = (block[0].match(/id:\s*([^\s#]+)/) || [])[1];
+    if (id === 'agent-default-model' && block.some((line) => /^\s*provider:\s*paratera\s*$/.test(line))) {
+      for (let i = from; i < to; i += 1) drop.add(i);
+      removedDefault = true;
+      continue;
+    }
+    if (id !== 'llm-pi-ai') continue;
+    const providerIndex = block.findIndex((line) => /^\s*providers:\s*$/.test(line));
+    if (providerIndex === -1) continue;
+    const providersIndent = indentOf(block[providerIndex]);
+    const keyIndex = block.findIndex((line, index) => index > providerIndex
+      && /^\s*paratera:\s*$/.test(line) && indentOf(line) > providersIndent);
+    if (keyIndex === -1) continue;
+    const keyIndent = indentOf(block[keyIndex]);
+    let keyEnd = keyIndex + 1;
+    while (keyEnd < block.length && (block[keyEnd].trim() === '' || indentOf(block[keyEnd]) > keyIndent)) keyEnd += 1;
+    for (let i = from + keyIndex; i < from + keyEnd; i += 1) drop.add(i);
+    removedProvider = true;
+    // Any sibling provider left at the same level keeps the entry; otherwise the
+    // empty providers mapping would fail validation, so drop the whole entry.
+    const siblings = block.filter((line, index) => index > providerIndex && (index < keyIndex || index >= keyEnd)
+      && line.trim() !== '' && indentOf(line) === keyIndent && !line.trim().startsWith('-'));
+    if (!siblings.length) for (let i = from; i < to; i += 1) drop.add(i);
+  }
+  if (!drop.size) return { text, changed: false, removedProvider, removedDefault };
+  const kept = lines.filter((_, index) => !drop.has(index));
+  const next = kept.join('\n');
+  return { text: next, changed: next !== text, removedProvider, removedDefault };
 }
 
 export function findPnpm(nodeExecutable = process.execPath) {
@@ -141,6 +215,34 @@ function inspect(profileDir) {
   return { manifestPath, linkEntry, linked, bundleListed, moduleLinked, target, moduleDir };
 }
 
+/** Remove imported models and plugin state so an uninstall leaves no stale config. */
+function cleanupPluginData({ profileDir, dshHome, purgeProfile = false }) {
+  const result = { patchFile: null, removedProvider: false, removedDefault: false, removedFiles: [], chromeProfileRemoved: false };
+  const patchFile = path.join(profileDir, 'cordis.patch.yml');
+  if (fs.existsSync(patchFile)) {
+    const before = fs.readFileSync(patchFile, 'utf8');
+    const plan = planPatchCleanup(before);
+    if (plan.changed) {
+      const backup = `${patchFile}.balance-backup-${Date.now()}`;
+      fs.copyFileSync(patchFile, backup);
+      fs.chmodSync(backup, 0o600);
+      fs.writeFileSync(patchFile, plan.text);
+      result.patchFile = patchFile;
+      result.patchBackup = backup;
+      result.removedProvider = plan.removedProvider;
+      result.removedDefault = plan.removedDefault;
+    }
+  }
+  for (const file of pluginDataPaths(dshHome).sessionFiles) {
+    try { if (fs.existsSync(file)) { fs.rmSync(file, { force: true }); result.removedFiles.push(file); } } catch {}
+  }
+  if (purgeProfile) {
+    const dir = pluginDataPaths(dshHome).chromeProfile;
+    try { if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); result.chromeProfileRemoved = true; } } catch {}
+  }
+  return result;
+}
+
 async function main() {
   let options;
   try {
@@ -150,7 +252,7 @@ async function main() {
     process.exit(1);
   }
   if (options.help) {
-    console.log('node scripts/install.mjs [--profile desktop] [--dsh-home DIR] [--dry-run|--verify|--uninstall|--no-install|--task|--no-task]');
+    console.log('node scripts/install.mjs [--profile desktop] [--dsh-home DIR] [--dry-run|--verify|--uninstall|--no-install|--task|--no-task] [--keep-data] [--purge-profile]');
     return;
   }
   if (!['darwin', 'win32'].includes(process.platform)) throw new Error('supported platforms: macOS and Windows');
@@ -222,6 +324,10 @@ async function main() {
     }
   }
 
+  if (options.uninstall && !options.keepData) {
+    summary.cleanup = cleanupPluginData({ profileDir, dshHome: options.dshHome, dshProfile: options.profile, purgeProfile: options.purgeProfile });
+  }
+
   if (options.task && !options.uninstall && platformPlan.task) {
     summary.task = runBackgroundTask({ plan: platformPlan, dshHome: options.dshHome });
   }
@@ -232,7 +338,7 @@ async function main() {
   if (summary.task?.ok === false) summary.error = 'background-task-failed';
   summary.state = { linked: state.linked, bundleListed: state.bundleListed, moduleLinked: state.moduleLinked };
   summary.next = options.uninstall
-    ? ['restart DSH']
+    ? ['restart DSH', options.keepData ? null : 'imported models and session files were removed; rerun with --keep-data to keep them'].filter(Boolean)
     : [
       'restart DSH',
       'settings -> 清华算力余额 -> 保存凭据',

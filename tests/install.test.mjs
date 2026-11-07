@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
-import { planManifest, PACKAGE_NAME, runBackgroundTask } from '../scripts/install.mjs'
+import { planManifest, planPatchCleanup, pluginDataPaths, PACKAGE_NAME, runBackgroundTask } from '../scripts/install.mjs'
 import { resolveInstallPlan } from '../lib/platform.mjs'
 
 const PLUGIN = 'F:\\Vibe Coding\\插件开发\\dsh-tsinghua-paratera'
@@ -84,4 +84,64 @@ test('a failed task registration is exposed to the installer summary', () => {
   })
   assert.equal(result.ok, false)
   assert.match(result.tail, /bootstrap failure/)
+})
+
+test('uninstall plans remove the paratera provider and a default-model pointer', () => {
+  const patch = [
+    '- id: agent-default-model',
+    '  config:',
+    '    provider: paratera',
+    '    model: DeepSeek-V4.1-Flash-1017',
+    '- id: llm-pi-ai',
+    '  config:',
+    '    providers:',
+    '      paratera:',
+    '        models:',
+    '          - id: DeepSeek-V4.1-Flash-1017',
+    '            contextWindow: 1024000',
+    '        apiKeyEnv: PARATERA_API_KEY',
+    '- id: plugin-market',
+    '  config:',
+    '    indexes: []',
+    '',
+  ].join('\n')
+  const plan = planPatchCleanup(patch)
+  assert.equal(plan.changed, true)
+  assert.equal(plan.removedProvider, true)
+  assert.equal(plan.removedDefault, true)
+  assert.equal(plan.text.includes('paratera'), false)
+  assert.equal(plan.text.includes('DeepSeek-V4.1-Flash-1017'), false)
+  assert.equal(plan.text.includes('plugin-market'), true)
+  assert.equal(planPatchCleanup(plan.text).changed, false)
+})
+
+test('uninstall keeps other providers and unrelated default models', () => {
+  const patch = [
+    '- id: llm-pi-ai',
+    '  config:',
+    '    providers:',
+    '      deepseek:',
+    '        displayName: DeepSeek',
+    '      paratera:',
+    '        displayName: Paratera',
+    '- id: agent-default-model',
+    '  config:',
+    '    provider: deepseek',
+    '    model: default',
+    '',
+  ].join('\n')
+  const plan = planPatchCleanup(patch)
+  assert.equal(plan.removedProvider, true)
+  assert.equal(plan.removedDefault, false)
+  assert.equal(plan.text.includes('deepseek:'), true)
+  assert.equal(plan.text.includes('paratera'), false)
+  assert.equal(plan.text.includes('provider: deepseek'), true)
+})
+
+test('plugin data paths cover session files and the dedicated Chrome profile', () => {
+  const mac = pluginDataPaths('/tmp/home/.dsh', 'darwin', '/Users/example')
+  assert.ok(mac.sessionFiles.every((file) => file.startsWith('/tmp/home/.dsh/')))
+  assert.equal(mac.chromeProfile, '/Users/example/Library/Application Support/DSH Tsinghua Paratera')
+  const win = pluginDataPaths('C:\\dsh', 'win32', 'C:\\Users\\example', { LOCALAPPDATA: 'C:\\Users\\example\\AppData\\Local' })
+  assert.equal(win.chromeProfile, 'C:\\Users\\example\\AppData\\Local\\dsh-tsinghua-paratera-profile')
 })

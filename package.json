@@ -1,6 +1,6 @@
 {
   "name": "dsh-tsinghua-paratera",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
     "install:dsh": "node scripts/install.mjs",
