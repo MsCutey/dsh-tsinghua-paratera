@@ -1,0 +1,82 @@
+{
+  "name": "dsh-tsinghua-paratera",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --test --test-force-exit tests/*.test.mjs",
+    "install:dsh": "node scripts/install.mjs",
+    "verify:dsh": "node scripts/install.mjs --verify",
+    "verify:macos": "node scripts/verify-dsh-macos.mjs",
+    "verify:chrome": "node scripts/verify-chrome-macos.mjs",
+    "verify:launchd": "node scripts/verify-launchd-macos.mjs",
+    "verify:host-sdk": "node scripts/verify-host-sdk.mjs",
+    "task:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1",
+    "task:macos": "node scripts/setup-macos-task.mjs",
+    "build:macos": "node --input-type=module -e \"import {buildCredentialHelper} from './lib/macos-credentials.mjs'; console.log(await buildCredentialHelper())\"",
+    "verify:privacy": "node --test tests/privacy.test.mjs",
+    "verify:auth": "node scripts/verify-auth-isolation.mjs",
+    "release:prepare": "node scripts/prepare-public-release.mjs"
+  },
+  "private": true,
+  "description": "DSH 非官方清华算力（Paratera）插件：统一身份认证登录与续期、算力券余额、控制台 API 密钥管理、模型导入与参数设置",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "scripts/install.mjs",
+    "scripts/setup-macos-task.mjs",
+    "scripts/setup-windows-task.ps1",
+    "scripts/macos-credentials.swift",
+    "scripts/read-easycompute-credentials.ps1",
+    "scripts/store-easycompute-credentials.ps1",
+    "docs/ARCHITECTURE.md",
+    "docs/SECURITY-AUDIT.md",
+    "cordis.patch.yml",
+    "README.md",
+    "AGENTS.md",
+    "PRIVACY.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "manifestVersion": 1,
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-model-selection"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "keywords": [
+    "balance",
+    "deepseek-harness",
+    "dsh-plugin",
+    "easycompute",
+    "paratera",
+    "tsinghua"
+  ],
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MsCutey/dsh-tsinghua-paratera.git"
+  },
+  "homepage": "https://github.com/MsCutey/dsh-tsinghua-paratera",
+  "bugs": {
+    "url": "https://github.com/MsCutey/dsh-tsinghua-paratera/issues"
+  }
+}

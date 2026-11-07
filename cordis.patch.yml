@@ -1,0 +1,7 @@
+# dsh-tsinghua-paratera bundle patch
+# 余额取自清华算力平台；专用浏览器会话续期，可选使用系统加密凭据存储。
+- insert:
+    - id: tsinghua-paratera
+      name: dsh-tsinghua-paratera
+      config:
+        cacheMs: 5000
