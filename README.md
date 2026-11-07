@@ -3,7 +3,7 @@
 DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
 登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
-当前版本：**1.0.2**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+当前版本：**1.0.3**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
 
 > **适用范围**：仅适用于通过 `id.tsinghua.edu.cn` 登录的清华算力平台账号（`easycompute.cs.tsinghua.edu.cn`）。
 > Paratera 官方账号或其他高校、企业的 Paratera 接入**不在支持范围**，登录步骤无法通过。
@@ -90,12 +90,14 @@ Windows 使用当前用户计划任务；Mac 使用当前用户 LaunchAgent。�
 ## 卸载与本地数据
 
 ```sh
-node scripts/install.mjs --uninstall
+node scripts/install.mjs --uninstall              # 同时移除已导入的模型与会话
+node scripts/install.mjs --uninstall --keep-data  # 只摘除插件，保留模型与会话
+node scripts/install.mjs --uninstall --purge-profile  # 另外删除专用 Chrome profile
 ```
 
-Mac 默认先停止对应后台任务再移除插件；Windows 的后台任务可在任务计划程序中删除。卸载保留登录凭据、会话和浏览器 profile，以免误删共享密钥。
+卸载会做三件事：从 profile 清单移除依赖与 bundle；从 `cordis.patch.yml` 删除插件写入的 `paratera` provider（以及指向它的默认模型条目，如果有），改动前自动备份；删除会话与状态文件（`easycompute-session.json`、`easycompute-state.json`、`paratera-console-session.json`、刷新锁）。
 
-如需清理：退出专用 Chrome 后，仅清理该插件的会话文件与专用 profile；Mac 密码在「钥匙串访问」中按 `DSH 清华算力余额` 查找，Windows 密码为 DSH_HOME 内的 `easycompute-credentials.bin`。导入到 DSH 的 API 密钥由宿主管理，必要时先在平台撤销对应密钥。详见 [隐私说明](PRIVACY.md)。
+Mac 默认先停止对应后台任务再移除插件；Windows 的后台任务可在任务计划程序中删除。密码不随卸载删除：Mac 在「钥匙串访问」中按 `DSH 清华算力余额` 查找，Windows 为 DSH_HOME 内的 `easycompute-credentials.bin`；需要时手动删除。导入到 DSH 的 API 密钥归宿主所有，删除 provider 不会撤销平台上的密钥，必要时先去平台撤销。卸载后重新安装并导入即可恢复模型配置。
 
 ## 隐私与安全
 

@@ -99,3 +99,10 @@ test('token ids with unsafe characters are still rejected', async () => {
     assert.deepEqual(result, { ok: false, error: 'keys-invalid-response' }, uuid);
   }
 });
+
+test('a console 500 on delete is reported as a platform rejection', async () => {
+  mock.method(fs, 'readFileSync', () => JSON.stringify({ token: 'TEST_TOKEN_NEVER_REAL' }));
+  mock.method(globalThis, 'fetch', async () => new Response('{"code":100011,"message":"解析数据失败"}', { status: 500 }));
+  const result = await deleteKey('AAAA+BBBB/CCCC==');
+  assert.deepEqual(result, { ok: false, error: 'key-delete-rejected' });
+});
