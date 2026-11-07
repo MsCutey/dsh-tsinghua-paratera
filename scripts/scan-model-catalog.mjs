@@ -7,7 +7,7 @@
 //   node scripts/scan-model-catalog.mjs
 //
 // The browser profile is the plugin's dedicated one; the console session must
-// already be connected (设置 → 清华算力（Paratera） → 连接控制台).
+// already be connected (设置 → 清华算力余额 → 连接控制台).
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

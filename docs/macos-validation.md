@@ -35,7 +35,7 @@
 ## 实机验收步骤
 
 1. 检查实际 DSH 版本与 profile，安装插件并运行 `scripts/install.mjs --verify`。
-2. 用户完全退出并重开 DSH；确认「清华算力（Paratera）」设置页。
+2. 用户完全退出并重开 DSH；确认「清华算力余额」设置页。
 3. 用户在原生窗口保存凭据，或在新版专用 Chrome 手动登录（窗口可以保持打开）。升级前已打开的旧版专用 Chrome 需先退出一次。
 4. 点「立即刷新」，与清华算力平台页面核对 `couponFree`；确认 provider 为 `paratera` 时显示余额，切换其它 provider 后隐藏。
 5. 确认无真实 token/密码下发给客户端；真实探测输出不得包含 token/密码。

@@ -833,17 +833,23 @@ function modelsFixture(handler, options = {}) {
 
 test('the settings section survives a missing or broken composer slot', () => {
   const sections = new Map()
+  const specs = new Map()
   const ctx = {
     slots: {
       inject(name, fn) {
         if (name === 'conversation.input.right') throw Error('slot renamed upstream')
         return fn()
       },
-      register(spec, value) { if (spec.name === 'settings.section') sections.set(spec.id, value) },
+      register(spec, value) {
+        if (spec.name === 'settings.section') { specs.set(spec.id, spec); sections.set(spec.id, value) }
+      },
     },
   }
   fixture().plugin.apply(ctx)
   assert.deepEqual([...sections.keys()], ['tsinghua-paratera'])
+  // The sidebar truncates long labels; keep the section short enough to render whole.
+  assert.equal(specs.get('tsinghua-paratera').label(), '清华算力余额')
+  assert.ok(specs.get('tsinghua-paratera').label().length <= 8)
 })
 
 test('the composer slot falls back to an empty store when modelDirectories is gone', () => {

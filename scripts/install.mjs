@@ -235,7 +235,7 @@ async function main() {
     ? ['restart DSH']
     : [
       'restart DSH',
-      'settings -> 清华算力（Paratera） -> 保存凭据',
+      'settings -> 清华算力余额 -> 保存凭据',
       summary.task?.ok === false ? 'background task failed; rerun with --task or see the error above' : null,
     ].filter(Boolean);
   console.log(JSON.stringify(summary, null, 2));
