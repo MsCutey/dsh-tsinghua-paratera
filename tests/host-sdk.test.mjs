@@ -10,6 +10,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { importKey } from '../lib/import.mjs';
 import vm from 'node:vm';
+import { browserSdk } from './browser-sdk.mjs';
 
 const sdkRoot = process.env.DSH_SDK_NODE_MODULES;
 const SECRET = 'sk-test-only-installed-host-0123456789';
@@ -17,12 +18,129 @@ const PREVIOUS = 'sk-test-only-installed-host-previous-9876543210';
 const MODEL = 'test-org/test-import-model';
 const SECOND_MODEL = 'test-org/test-import-second-model';
 
+test('installed browser React renders the composer balance using real slot and model services', { skip: !sdkRoot }, async () => {
+  const browser = await browserSdk(sdkRoot);
+  const { modules, page } = browser;
+  const load = (name) => {
+    let entry;
+    vm.runInNewContext(fs.readFileSync(path.join(sdkRoot, '@deepseek-ai', name, 'lib/client.js'), 'utf8'), { window: { __ModuleLoader__: { load: (value) => { entry = value } } } });
+    return entry.factory((id) => { if (!(id in modules)) throw Error('unknown browser module '+id); return modules[id] });
+  };
+  const cordis = modules['@deepseek-ai/cordis'];
+  const React = modules.react;
+  const root = new cordis.Context();
+  const modelModule = load('dsh-client-ui-model-selection');
+  const renderer = load('dsh-client-ui-renderer');
+  const store = modules['@deepseek-ai/dsh-client-store'].createSnapshotStore({ next: { provider: 'paratera', model: MODEL } });
+  const binding = { session: { projections: { faceOf: () => store }, getSnapshot: () => ({ blank: false }) } };
+  class Remote extends cordis.Service {
+    constructor(ctx) { super(ctx, 'remote') }
+    get session() { return this.ctx['remote.session'] }
+    $on() { return () => {} }
+  }
+  // Real services are owned by sibling plugins, not the root's unguarded store.
+  const remoteFork = root.plugin({ apply(ctx) {
+    ctx.reflect.provide('sessions', { scope: () => root, binding: () => binding, subagentAddress: () => undefined });
+    ctx.reflect.provide('remote.session', { modelCatalog: async () => ({ ok: true, value: { default: { provider: 'paratera', model: MODEL }, groups: [{ id: 'paratera', models: [{ id: MODEL }] }], failures: [] } }) });
+    new Remote(ctx);
+  } });
+  let entry;
+  const warnings = [];
+  vm.runInNewContext(fs.readFileSync(process.env.DSH_TEST_CLIENT_SOURCE || new URL('../lib/client.js', import.meta.url), 'utf8'), {
+    window: { __ModuleLoader__: { load: (value) => { entry = value } } }, document: page.window.document,
+    AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
+    console: { warn: (...args) => warnings.push(args) },
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true, availableQuota: 123.45 }) }),
+  });
+  const slotFork = root.plugin(renderer);
+  const scopeBinding = { key: 'rendered-sdk-session', ctx: root, hooks: {}, keyedHooks: {}, props: {} };
+  const bindingSource = { getSnapshot: () => scopeBinding, subscribe: () => () => {} };
+  const declarationFork = root.plugin({ inject: ['slots'], apply(ctx) {
+    ctx.slots.installScope('session', { current: bindingSource, bindingSource: () => bindingSource, renderArea: (_, props) => props.children });
+    ctx.slots.register({ name: 'root', children: {
+      'settings.section': { kind: 'list', scope: 'root' }, 'conversation.input.right': { kind: 'list', scope: 'session' },
+    } }, ({ renderSlot, SessionProvider }) => React.createElement(SessionProvider, { session: 'rendered-sdk-session' }, renderSlot('conversation.input.right', {})));
+  } });
+  const modelFork = root.plugin(modelModule.ModelDirectoryResolver);
+  const pluginFork = root.plugin(entry.factory(() => React));
+  let rendered;
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const chip = root.get('slots').entries('conversation.input.right')[0];
+    assert.ok(chip);
+    // Do not call chip.inject from the unguarded root context: that would prime
+    // the model-directory cache and hide the undeclared remote.session access.
+    rendered = root.get('uiRenderer').mount(page.window.document.getElementById('test'));
+    for (let attempt = 0; attempt < 20 && !page.window.document.querySelector('.paratera-balance')?.textContent.includes('123.45'); attempt++) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(page.window.document.querySelector('.paratera-balance')?.textContent, '¥123.45');
+    assert.equal(warnings.length, 0);
+  } finally {
+    if (rendered) modules['react-dom'].flushSync(() => rendered());
+    await pluginFork.dispose(); await modelFork.dispose(); await declarationFork.dispose(); await slotFork.dispose(); await remoteFork.dispose();
+    browser.dispose();
+  }
+});
+
+test('composer uses the real model-directory service with all guarded remote dependencies', { skip: !sdkRoot }, async () => {
+  const cordis = await import(pathToFileURL(path.join(sdkRoot, '@deepseek-ai/cordis/lib/index.js')).href);
+  const root = new cordis.Context();
+  const snapshotStore = (initial) => {
+    let value = initial;
+    const listeners = new Set();
+    return {
+      getSnapshot: () => value,
+      subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
+      set(next) { value = next; for (const listener of listeners) listener() },
+      update(update) { const draft = structuredClone(value); update(draft); this.set(draft) },
+    };
+  };
+  let stockEntry, pluginEntry;
+  vm.runInNewContext(fs.readFileSync(path.join(sdkRoot, '@deepseek-ai/dsh-client-ui-model-selection/lib/client.js'), 'utf8'), {
+    window: { __ModuleLoader__: { load: (entry) => { stockEntry = entry } } },
+  });
+  const stock = stockEntry.factory((name) => name === '@deepseek-ai/cordis' ? cordis
+    : name === '@deepseek-ai/dsh-client-store' ? { createSnapshotStore: snapshotStore } : {});
+  const projected = snapshotStore({ next: { provider: 'paratera', model: MODEL } });
+  const binding = { session: { projections: { faceOf: () => projected }, getSnapshot: () => ({ blank: false }) } };
+  root.reflect.provide('sessions', { scope: () => root, binding: () => binding, subagentAddress: () => undefined });
+  root.reflect.provide('remote.session', {
+    modelCatalog: async () => ({ ok: true, value: { default: { provider: 'paratera', model: MODEL }, groups: [{ id: 'paratera', models: [{ id: MODEL }] }], failures: [] } }),
+  });
+  // The real remote namespace also guards its dotted service via caller context.
+  class Remote extends cordis.Service {
+    constructor(ctx) { super(ctx, 'remote') }
+    get session() { return this.ctx['remote.session'] }
+    $on() { return () => {} }
+  }
+  new Remote(root);
+  const registrations = new Map();
+  root.reflect.provide('slots', {
+    inject: (_, callback) => callback(),
+    register(spec, component) { registrations.set(spec.name, { spec, component }); return () => registrations.delete(spec.name) },
+  });
+  const warnings = [];
+  vm.runInNewContext(fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), {
+    window: { __ModuleLoader__: { load: (entry) => { pluginEntry = entry } } },
+    fetch: async () => ({ ok: true }), console: { warn: (...args) => warnings.push(args) },
+  });
+  const modelFork = root.plugin(stock.ModelDirectoryResolver);
+  const pluginFork = root.plugin(pluginEntry.factory(() => ({ createElement: () => {} })));
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const store = registrations.get('conversation.input.right').spec.inject('sdk-composer-session').directory;
+    assert.equal(store.getSnapshot().current?.provider, 'paratera', warnings.map((args) => String(args.at(-1))).join('\n'));
+    assert.equal(store.getSnapshot().current?.model, MODEL);
+    assert.equal(warnings.length, 0);
+  } finally { await pluginFork.dispose(); await modelFork.dispose(); }
+});
+
 test('installed client context binds a late model directory before mounting the balance chip', { skip: !sdkRoot }, async () => {
   const { Context } = await import(pathToFileURL(path.join(sdkRoot, '@deepseek-ai/cordis/lib/index.js')).href);
   const root = new Context();
   let entry;
   const registrations = new Map();
   const store = { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: 'paratera', model: MODEL } }) };
+  for (const service of ['sessions', 'remote', 'remote.session']) root.reflect.provide(service, {});
   root.reflect.provide('slots', {
     inject: (_, callback) => callback(),
     register(spec, component) { registrations.set(spec.name, { spec, component }); return () => registrations.delete(spec.name) },

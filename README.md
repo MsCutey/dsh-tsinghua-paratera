@@ -1,7 +1,7 @@
 # dsh-paratera-balance
 
 DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力平台（easycompute）算力券余额**。
-Mac 版本 `0.16.1-macos.2`，同步 Windows `0.16.1` 的控制台密钥管理、模型导入/设置、二次认证与兼容性诊断。
+Mac 版本 `0.16.1-macos.3`，同步 Windows `0.16.1` 的控制台密钥管理、模型导入/设置、二次认证与兼容性诊断。
 Mac 使用原生钥匙串窗口，Windows 继续使用 DPAPI。当前验证范围见 [0.16.1 Mac 验证记录](docs/macos-validation-0.16.1.md)。
 
 ## Mac 安装
@@ -100,6 +100,7 @@ Windows 密码以 DPAPI 加密保存在本机（仅当前 Windows 账户可解�
 - 金额为算力券剩余额度 `couponFree`，悬停显示已用/总额、院系、会话有效期
 - 会话失效时显示「需登录」，不再静默变成空白或 0
 - `macos.2` 修复模型服务延迟加载时余额标记绑定空状态的问题；余额标记等待模型服务就绪后再注册，设置页保持独立可用。
+- `macos.3` 补齐模型目录的 `sessions / remote / remote.session` 依赖，并缓存降级快照，修复真实界面中余额组件的权限错误和 React 循环渲染崩溃。
 
 ## 设置页
 
@@ -293,6 +294,9 @@ Mac 对应命令：
 ```sh
 npm run verify:host-sdk -- --electron "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness"
 ```
+
+运行安装包浏览器渲染测试前，在源码目录执行 `pnpm install`（测试用 jsdom 属于开发依赖）。
+该测试加载本机安装包自身的 React、Cordis、插槽和模型目录服务，在独立 DOM 中断言余额文本实际出现；不启动用户会话，也不使用真实凭据。
 
 测试用 `--test-force-exit` 运行：插件按设计保留后台定时器，测试结束时不等事件循环清空。
 

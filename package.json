@@ -1,6 +1,6 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.16.1-macos.2",
+  "version": "0.16.1-macos.3",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
     "install:dsh": "node scripts/install.mjs",
@@ -62,5 +62,8 @@
     "dsh-plugin",
     "easycompute",
     "tsinghua"
-  ]
+  ],
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
 }

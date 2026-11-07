@@ -1,6 +1,16 @@
 # macOS 0.16.1 同步验证
 
-日期：2026-11-07（Asia/Shanghai）。上游 Windows 基线为 `v0.16.1` / `a1a17c0`，Mac 分支为 `macos-support`，当前版本 `0.16.1-macos.2`。
+日期：2026-11-07（Asia/Shanghai）。上游 Windows 基线为 `v0.16.1` / `a1a17c0`，Mac 分支为 `macos-support`，当前版本 `0.16.1-macos.3`。
+
+## macos.3 实际渲染修复与确认
+
+用户复测 macos.2 后仍未显示。通过实际 Desktop DevTools 控制台确认：调用模型目录时缺少 `remote.session` 注入；异常降级的 `getSnapshot()` 每次创建新对象，又触发 React #185，导致插槽组件被错误边界隐藏。
+
+修复为完整注入 `modelDirectories / sessions / remote / remote.session`，并使用稳定的空快照。新增安装包浏览器测试，使用真实 React、Cordis、SlotRegistry、模型目录及完整插槽渲染，远端 API 和金额均为虚构数据；SDK 服务由同级插件提供，避免根上下文或提前创建目录缓存掩盖权限错误。
+
+在同一新测试中，旧 macos.2 代码无法渲染余额，新代码能在 DOM 中显示虚构金额。4 项安装包契约/渲染测试全部通过。
+
+修复后直接检查本机真实 Desktop 的当前 Paratera 会话，已确认输入栏模型名称左侧实际显示余额，提示包含来源、更新时间和会话有效期。未更改用户的模型选择或会话内容，本记录不保存实际金额或账户信息。
 
 ## macos.2 输入栏标记修复
 

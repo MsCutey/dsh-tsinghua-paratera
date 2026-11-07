@@ -859,6 +859,7 @@ test('the composer slot falls back to an empty store when modelDirectories is go
   fixture().plugin.apply(ctx)
   const store = injected.directory
   assert.equal(Object.keys(store.getSnapshot()).length, 0)
+  assert.equal(store.getSnapshot(), store.getSnapshot(), 'useSyncExternalStore requires a cached fallback snapshot')
   let notified = 0
   const off = store.subscribe(() => { notified += 1 })
   off()

@@ -79,7 +79,7 @@ test('late model-directory availability registers the chip without blocking sett
   const plugin = entry.factory(() => ({ createElement: () => {} }))
   const ctx = {
     get: () => undefined,
-    inject(names, callback) { assert.deepEqual(Array.from(names), ['modelDirectories']); ready = callback },
+    inject(names, callback) { assert.deepEqual(Array.from(names), ['modelDirectories', 'sessions', 'remote', 'remote.session']); ready = callback },
     slots: {
       inject: (_, callback) => callback(),
       register(spec, component) {
