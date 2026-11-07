@@ -114,7 +114,7 @@ test('the trusted-device prompt is recognised and answered', async () => {
   const view = await trustDeviceState(send);
   assert.equal(view.asking, true);
   assert.equal(view.trust, '是');
-  assert.equal(await confirmTrustDevice(send), true);
+  assert.equal(await confirmTrustDevice(send, { trust: true }), true);
   assert.equal(seen.length, 2);
 });
 

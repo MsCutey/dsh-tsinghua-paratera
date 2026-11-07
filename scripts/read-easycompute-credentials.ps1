@@ -2,7 +2,8 @@
 # Called by the plugin only when a silent login is required.
 Add-Type -AssemblyName System.Security
 $ErrorActionPreference = 'Stop'
-$file = Join-Path $env:USERPROFILE '.dsh\easycompute-credentials.bin'
+$dshRoot = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+$file = Join-Path $dshRoot 'easycompute-credentials.bin'
 if (-not (Test-Path $file)) { Write-Output 'MISSING'; exit 2 }
 try {
   $protected = [System.IO.File]::ReadAllBytes($file)

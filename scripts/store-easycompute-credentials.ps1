@@ -5,7 +5,9 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Security
 
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $env:USERPROFILE '.dsh\easycompute-credentials.bin'
+$dshRoot = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+[System.IO.Directory]::CreateDirectory($dshRoot) | Out-Null
+$out = Join-Path $dshRoot 'easycompute-credentials.bin'
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = '清华算力凭据（仅本机加密保存）'

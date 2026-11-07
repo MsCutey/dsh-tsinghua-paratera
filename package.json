@@ -1,6 +1,6 @@
 {
   "name": "dsh-paratera-balance",
-  "version": "0.16.1-macos.3",
+  "version": "1.0.0",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
     "install:dsh": "node scripts/install.mjs",
@@ -11,7 +11,10 @@
     "verify:host-sdk": "node scripts/verify-host-sdk.mjs",
     "task:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows-task.ps1",
     "task:macos": "node scripts/setup-macos-task.mjs",
-    "build:macos": "node --input-type=module -e \"import {buildCredentialHelper} from './lib/macos-credentials.mjs'; console.log(await buildCredentialHelper())\""
+    "build:macos": "node --input-type=module -e \"import {buildCredentialHelper} from './lib/macos-credentials.mjs'; console.log(await buildCredentialHelper())\"",
+    "verify:privacy": "node --test tests/privacy.test.mjs",
+    "verify:auth": "node scripts/verify-auth-isolation.mjs",
+    "release:prepare": "node scripts/prepare-public-release.mjs"
   },
   "private": true,
   "description": "DSH 原生模型栏余额插件：读取清华算力平台算力券余额，专用浏览器会话自动续期，设置页可刷新与重新登录",
@@ -24,11 +27,21 @@
   },
   "files": [
     "lib",
-    "scripts",
-    "docs",
+    "scripts/install.mjs",
+    "scripts/setup-macos-task.mjs",
+    "scripts/setup-windows-task.ps1",
+    "scripts/macos-credentials.swift",
+    "scripts/read-easycompute-credentials.ps1",
+    "scripts/store-easycompute-credentials.ps1",
+    "docs/ARCHITECTURE.md",
+    "docs/SECURITY-AUDIT.md",
     "cordis.patch.yml",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "PRIVACY.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {
@@ -47,15 +60,6 @@
     }
   },
   "license": "MIT",
-  "author": "BCBAI",
-  "repository": {
-    "type": "git",
-    "url": "https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git"
-  },
-  "homepage": "https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance",
-  "bugs": {
-    "url": "https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance/-/issues"
-  },
   "keywords": [
     "balance",
     "deepseek-harness",

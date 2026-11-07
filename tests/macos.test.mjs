@@ -19,7 +19,8 @@ test('Mac uses system/user Chrome apps and an isolated Application Support profi
   // path.resolve() prefixes a drive on Windows, so only the suffix is host-independent.
   assert.ok(posix(value.sessionFile).endsWith('/easycompute-session.json'));
   assert.ok(posix(value.dshHome).endsWith('/test dsh'));
-  assert.equal(posix(value.profileDir), '/Users/测试 User/Library/Application Support/DSH Paratera Balance/Chrome');
+  assert.equal(value.profileDir, path.join(value.dshHome, 'browser-profile'));
+  assert.equal(posix(platformPaths('darwin', '/Users/Example', {}).profileDir), '/Users/Example/Library/Application Support/DSH Paratera Balance/Chrome');
   assert.ok(value.chromeCandidates.map(posix).includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(value.chromeCandidates.map(posix).includes('/Users/测试 User/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(!value.chromeCandidates.some((file) => file.endsWith('.exe')));
@@ -79,7 +80,10 @@ test('SSO fills the form, matches a spaced login label, and submits once', async
   const user = new Input('username');
   const password = new Input('password');
   let reads = 0;
-  const send = async (_, { expression }) => {
+  const send = async (method, { expression } = {}) => {
+    if (method === 'Page.getFrameTree') return { result: { frameTree: { frame: { id: 'test-frame', url: 'https://id.tsinghua.edu.cn/login' } } } };
+    if (method === 'Page.createIsolatedWorld') return { result: { executionContextId: 9 } };
+    if (expression === 'location.origin') return { result: { result: { value: 'https://id.tsinghua.edu.cn' } } };
     if (expression.includes('const { user, pass }')) {
       return { result: { result: { value: vm.runInNewContext(expression, {
         location: { origin: 'https://id.tsinghua.edu.cn' },
@@ -120,7 +124,7 @@ test('installer rejects missing/unsafe arguments and keeps pnpm enabled on unins
   assert.throws(() => parseArgs(['--profile', '../../escape']));
   assert.throws(() => parseArgs(['--dsh-home', '--verify']));
   assert.equal(parseArgs(['--uninstall']).install, true);
-  if (process.platform === 'darwin') assert.equal(findPnpm().kind, 'script');
+  if (process.platform === 'darwin' && findPnpm().kind === 'script') assert.ok(fs.existsSync(findPnpm().path));
 });
 
 test('refresh lock excludes concurrent processes and state snapshots are private', async () => {

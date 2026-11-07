@@ -21,7 +21,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = path.resolve(HERE, '..');
 
 export function parseArgs(argv) {
-  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, task: true, json: false };
+  const options = { profile: 'desktop', dshHome: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), dryRun: false, verify: false, uninstall: false, install: true, task: false, taskExplicit: false, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--profile' || arg === '--dsh-home') {
@@ -36,12 +36,13 @@ export function parseArgs(argv) {
     else if (arg === '--verify') options.verify = true;
     else if (arg === '--uninstall') options.uninstall = true;
     else if (arg === '--no-install') options.install = false;
-    else if (arg === '--task') options.task = true;
-    else if (arg === '--no-task') options.task = false;
+    else if (arg === '--task') { options.task = true; options.taskExplicit = true; }
+    else if (arg === '--no-task') { options.task = false; options.taskExplicit = true; }
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else throw new Error('unknown option: ' + arg);
   }
+  if (options.uninstall && !options.taskExplicit) options.task = true;
   return options;
 }
 

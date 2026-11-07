@@ -20,7 +20,7 @@ function fixture(provider = 'paratera') {
     window: { __ModuleLoader__: { load: v => { entry = v } } },
     document, AbortController, setTimeout, clearTimeout,
     setInterval: fn => { intervals.set(++id, fn); return id }, clearInterval: key => intervals.delete(key),
-    fetch: async (url, opts) => { if (!String(url).includes('/diagnostics')) requests.push({url,opts}); return {ok:true,json:async()=>({ok:true,balance:983.02,availableQuota:983.02,calculationVerified:false,calculationNote:'估算'})} },
+    fetch: async (url, opts) => { if (!String(url).includes('/diagnostics')) requests.push({url,opts}); return {ok:true,json:async()=>({ok:true,balance:123.45,availableQuota:123.45,calculationVerified:false,calculationNote:'估算'})} },
   })
   const plugin = entry.factory(name => { assert.equal(name,'react'); return React })
   const stores = new Map()
@@ -51,7 +51,7 @@ test('uses native quota slot and session-specific model store', () => {
 test('fetches balance, exposes calculation caveat, and polls only while visible', async () => {
   const f=fixture(); f.render(); f.runEffect(); await settle()
   assert.equal(f.requests.length,1); assert.equal(f.requests[0].opts.credentials,'same-origin')
-  const view=f.render(); assert.equal(view.children[0],'¥983.02'); assert.match(view.props.title,/估算/)
+  const view=f.render(); assert.equal(view.children[0],'¥123.45'); assert.match(view.props.title,/估算/)
   f.document.visibilityState='hidden'; await [...f.intervals.values()][0](); assert.equal(f.requests.length,1)
   f.document.visibilityState='visible'; await f.listeners.get('visibilitychange')(); assert.equal(f.requests.length,2)
   f.dispose(); assert.equal(f.intervals.size,0); assert.equal(f.listeners.size,0)

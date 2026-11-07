@@ -83,7 +83,8 @@ test('host passes the injected credential/settings services and never caches imp
   assert.equal(result.headers['Cache-Control'], 'no-store');
   assert.equal(dependency.credentials, f.credentials);
   assert.equal(dependency.settings, f.settings);
-  assert.equal(result.body.uuid, 'uuid-1');
+  assert.equal(result.body.credentialImported, true);
+  assert.equal(result.body.uuid, undefined);
   f.disconnectSettings();
   await f.request({ uuid: 'uuid-1' });
   assert.equal(dependency.settings, null);
@@ -161,6 +162,7 @@ test('authenticated status exposes live stages and a recoverable redacted termin
   assert.ok(active.body.operationId);
   gate.resolve();
   const completed = await first;
+  assert.ok(!JSON.stringify(completed).includes(SECRET));
   const status = await f.request({}, { method: 'GET', route: ROUTE + '/status' });
   assert.equal(status.body.operationId, completed.body.operationId);
   assert.equal(status.body.stage, 'completed');

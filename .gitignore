@@ -11,3 +11,9 @@ Thumbs.db
 .credentials*
 paratera-token.json
 easycompute-session.json
+easycompute-state.json
+paratera-console-session.json
+easycompute-credentials.bin
+easycompute-refresh.lock
+*.keychain-db
+dist/

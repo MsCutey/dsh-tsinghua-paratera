@@ -1,23 +1,37 @@
-# dsh-paratera-balance
+# DSH Paratera Balance
 
-DSH 原生模型栏余额插件：在输入栏模型左侧显示**清华算力平台（easycompute）算力券余额**。
-Mac 版本 `0.16.1-macos.3`，同步 Windows `0.16.1` 的控制台密钥管理、模型导入/设置、二次认证与兼容性诊断。
-Mac 使用原生钥匙串窗口，Windows 继续使用 DPAPI。当前验证范围见 [0.16.1 Mac 验证记录](docs/macos-validation-0.16.1.md)。
+DeepSeek Harness（DSH）的非官方清华算力插件，支持 **macOS / Windows**。
+在使用 Paratera 模型时显示算力券余额，并提供控制台密钥管理、模型导入和模型参数设置。
 
-## Mac 安装
+当前版本：**1.0.0**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
 
-前置：macOS 13+、Google Chrome、Node 22+、已初始化的 DSH desktop profile。
-首次编译钥匙串辅助程序需要 Xcode Command Line Tools（`xcode-select --install`）。
-DSH 接口基线沿用上游要求 `0.2.1-rc.5+`；安装后的设置页与真实账号登录需在目标 DSH 中验收。
+## 功能
 
-Mac 开发版位于 `macos-support` 分支；使用该分支安装：
+- 输入栏显示算力券余额；设置页展示余额与会话状态。
+- 专用 Chrome 会话登录与续期，不使用日常 Chrome profile。
+- 可选保存登录密码：macOS Keychain / Windows 当前用户 DPAPI。
+- 短信、企业微信二次认证；验证码由用户输入。信任浏览器默认关闭，需主动选择。
+- 控制台 API 密钥列表、新建、改名、启停、删除及所选密钥导入。
+- 模型导入、上下文/最大输出、输入类型、思考挡位设置；通过 DSH Settings 即时更新。
+- 宿主兼容性诊断；后台续期为可选功能，安装时默认不注册。
 
-```sh
-git clone --branch macos-support https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git
-cd dsh-paratera-balance
-```
+余额来自清华算力平台的 `couponFree`，不是账单或实时结算保证。只有当前供应商为 `paratera` 时，输入栏才显示余额；其他供应商不显示这笔额度。
 
-已有本地目录时直接进入该目录：
+## 环境要求
+
+| 项目 | 要求 |
+| --- | --- |
+| 系统 | macOS 13+，或 Windows 10/11 |
+| 运行时 | Node.js 22+；可使用 DSH 附带的 Node |
+| 宿主 | 已初始化的 DSH desktop profile；本次实机验证版本为 0.2.1-rc.5 |
+| 浏览器 | Google Chrome |
+| Mac 首次安装 | Xcode Command Line Tools（`xcode-select --install`） |
+
+已实机验证 Apple Silicon Mac。Windows 有自动化回归，当前发行未在独立 Windows 设备重新完成全部登录流程；Intel Mac 及其他 DSH 版本也需要目标环境验收。诊断中的兼容区间不代表区间内每个版本都逐一实测。
+
+## 安装
+
+从本仓库 GitHub Releases 下载源码 ZIP 或插件 TGZ，解压到长期保留的位置。
 
 ```sh
 cd /path/to/dsh-paratera-balance
@@ -26,280 +40,84 @@ node scripts/install.mjs
 node scripts/install.mjs --verify
 ```
 
-没有全局 Node 时，可直接使用 DSH 附带的运行时：
+Windows 可在 PowerShell 中运行相同 Node 命令。安装器会备份 profile 清单，追加本地链接和 bundle，保留其他配置；重复执行不会重复追加。
+
+没有全局 Node 时，Mac 可使用：
 
 ```sh
 "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node" scripts/install.mjs
 ```
 
-安装器自动发现 DSH 的 pnpm，备份 profile 清单，再添加链接依赖与 bundle；重复安装不会重复追加。
-pnpm 失败会恢复清单备份，但不会回滚 pnpm 可能已产生的依赖目录变化，可修复错误后重试。
-`--dsh-home DIR` 和 `--profile NAME` 用于非默认 profile。
-安装默认注册当前用户的后台续期；如需沿用手动刷新的使用方式，使用 `node scripts/install.mjs --no-task`。
-自定义 `DSH_HOME` 使用独立 LaunchAgent 名称；后台任务失败会在 JSON 中标为 `ok: false`、`profileReady: true`，修复后可重跑安装。
+Windows 使用安装目录中 `resources\runtime\primary-runtime\dependencies\node\bin\node.exe`，或把该运行时加入当前终端 PATH。
 
-安装成功后，完全退出并重开 DSH，在「设置 → 清华算力余额」选择：
+可指定 `--dsh-home DIR`、`--profile NAME`；可用 `DSH_PNPM` 指定 pnpm.cjs。安装成功后完全退出并重开 DSH。
 
-- 「保存凭据」：在本机原生窗口输入账号密码，存到登录钥匙串中的 `DSH 清华算力余额` 项目；保存并关闭窗口后自动尝试登录，取消时保留原有凭据。状态轮询只检查钥匙串条目是否存在；实际登录时才读取密码。钥匙串锁定时需手动解锁或重新保存。
-- 「重新登录」：不保存密码，手动完成专用 Chrome 窗口中的登录；完成后返回 DSH 点「立即刷新」，窗口可以保持打开。验证码始终由用户处理。
+## 登录与余额
 
-升级前已经打开的旧版专用 Chrome 需要先退出一次，再用「重新登录」打开新窗口。
-macOS 仅关闭窗口可能仍保留进程；旧进程未退出时，设置页会给出具体提示。
-新版会复用自己的专用浏览器，最后一个窗口关闭后如进程仍驻留，会自动恢复为无头刷新。
+打开「设置 → 清华算力余额 → 账号登录」。
 
-Mac 的专用浏览器目录为 `~/Library/Application Support/DSH Paratera Balance/Chrome`，
-不会使用日常 Chrome 的 profile。会话和状态位于 `$DSH_HOME`（默认 `~/.dsh`），文件权限为 `0600`。
-钥匙串辅助程序在插件的 `.artifacts/macos-<架构>/` 中编译；更新或重编译后如系统要求授权，需由用户在本机确认。
+1. 选择「重新登录」，在专用 Chrome 窗口中完成登录，再回到 DSH 刷新。
+2. 如果需要自动登录，可选择「保存凭据」，在系统原生窗口输入密码；保存并关闭窗口后会尝试登录。
+3. 二次认证时，自己选择接收渠道并输入验证码。默认不把浏览器设为长期可信。
+4. 在「模型」中选择已导入的 Paratera 模型，输入栏模型名称旁会显示余额。
 
-后台续期默认随安装注册（仅当前用户登录期间运行，每 6 小时检查；睡眠和退出登录期间不保证运行）。手动检查与注册：
+手动登录不会由插件保存登录密码，但浏览器会话与短期 token 仍会保存在本机。验证码及密码不要粘贴到对话中。
+
+## 密钥与模型
+
+在完成平台登录后，选择「连接控制台 → 加载密钥 → 导入」。
+
+- 「导入并添加」保存所选密钥并追加所选模型；「仅保存密钥」不添加模型。
+- 密钥导入前先验证模型列表，不发送计费的模型推理；旧密钥在覆盖前交由 DSH 备份。
+- 完整 API 密钥不返回设置页；显示的是 SHA-256 摘要指纹，不包含密钥首尾字符。
+- 模型设置可以调整名称、上下文、最大输出、文本/图片输入及思考挡位；新模型默认 low / high / max。
+- 删除密钥会影响使用该密钥的应用；请仔细确认。创建密钥不等于购买订阅，后续模型调用仍受平台计费规则约束。
+
+平台模型广场和公开目录用于生成推荐值，不能保证每个路由实际支持声明的上限；请按目标模型验证。
+
+## 可选后台续期
 
 ```sh
-node scripts/setup-macos-task.mjs --dry-run
-node scripts/setup-macos-task.mjs
-launchctl print "gui/$(id -u)/cn.edu.tsinghua.dsh-paratera-balance.refresh"
+node scripts/install.mjs --task
 ```
 
-卸载：
+Windows 使用当前用户计划任务；Mac 使用当前用户 LaunchAgent。每 6 小时检查一次，只在相应用户会话和设备可运行时工作；不保证睡眠、断网或退出登录期间续期。
+自定义 DSH_HOME 使用独立浏览器目录和后台任务名称。后台任务遇到二次认证时结束本次检查，请回到 DSH 完成认证。
+
+## 卸载与本地数据
 
 ```sh
 node scripts/install.mjs --uninstall
 ```
 
-Mac 卸载默认先停止并移除对应 LaunchAgent，再移除插件。钥匙串项目、会话和浏览器 profile 保留；需要时用户可自行在「钥匙串访问」中删除凭据。
-后台续期遇到二次认证会结束本次任务并清理自己的等待浏览器；请回到 DSH 设置页完成认证。
+Mac 默认先停止对应后台任务再移除插件；Windows 的后台任务可在任务计划程序中删除。卸载保留登录凭据、会话和浏览器 profile，以免误删共享密钥。
 
-## 数据来源
+如需清理：退出专用 Chrome 后，仅清理该插件的会话文件与专用 profile；Mac 密码在「钥匙串访问」中按 `DSH 清华算力余额` 查找，Windows 密码为 DSH_HOME 内的 `easycompute-credentials.bin`。导入到 DSH 的 API 密钥由宿主管理，必要时先在平台撤销对应密钥。详见 [隐私说明](PRIVACY.md)。
 
-| 项 | 说明 |
-| --- | --- |
-| 会话 | `easycompute.cs.tsinghua.edu.cn` 的 `localStorage.token`，24 小时滑动续期 |
-| 余额接口 | `GET /auth/userInfo/query`（`token` 头），取 `couponFree / couponUsed / couponTotal` |
-| 续期 | 无头访问 `/home` 一次即自动续到 24 小时；插件每 5 分钟检查，剩余不足 1 小时则续期 |
-| 计划任务 | Windows `DSH Tsinghua Balance Refresh` / Mac LaunchAgent，每 6 小时检查，DSH 关闭时也可维持会话 |
+## 隐私与安全
 
-Windows 密码以 DPAPI 加密保存在本机（仅当前 Windows 账户可解密）；登录态保存在独立 Chrome 配置目录
-`%LOCALAPPDATA%\dsh-paratera-profile`，与日常浏览器互不影响。插件不绕过验证码：
-一旦出现验证码即中止自动登录并提示人工处理。
+请先阅读 [PRIVACY.md](PRIVACY.md)、[SECURITY.md](SECURITY.md) 和 [发布前审计摘要](docs/SECURITY-AUDIT.md)。
 
-## 自动登录
+本插件不含遥测或分析服务代码。账号登录、余额和密钥操作会访问指定平台；DSH 与 Chrome 自身的联网行为另受它们的设置控制。
+不必要的院系、班级、用户标识不写入余额缓存或返回界面，未知上游字段和原始异常不直接下发。
+本机 bearer token 缓存不等于硬件隔离；请勿在不可信共享系统中保存密码或保持登录窗口打开。
 
-- 账号密码通过 Windows DPAPI（CurrentUser 作用域）加密存于 `~/.dsh/easycompute-credentials.bin`，
-  文件 ACL 收紧到当前用户；配置文件里没有明文密码。
-- token 失效时，插件用无头 Chrome 打开控制台，自动跳清华 SSO、填写账号密码并提交，
-  正常情况下不需人工；网络、SSO 和浏览器状态可能影响耗时或要求重新登录。
-- 若登录页出现图形验证码（通常只在多次失败后触发），插件立即中止并显示「需登录」，
-  不会尝试绕过验证码。
-- 账号若启用二次认证，密码通过后会停在「二次认证」页：插件把浏览器保活，设置页给出
-  「企业微信」「短信」两种方式和验证码输入框；码通过后还会遇到「是否记为信任浏览器」，
-  插件选「是」（180 天）再继续，这样后续静默续期不再需要验证码。
-- 上游 Windows 曾记录冷启动登录耗时 13 秒；该结果不代表 Mac 真实登录已通过。
+问题反馈只需提供版本号、错误码和复现步骤。不要上传账号密码、完整 API 密钥、cookie、会话文件、整个 profile 或未脱敏截图。
 
-## 显示逻辑
-
-- 仅在当前模型的 provider 为 `paratera` 时显示（DSH 的模型供应商 id，与余额数据源无关）
-- 金额为算力券剩余额度 `couponFree`，悬停显示已用/总额、院系、会话有效期
-- 会话失效时显示「需登录」，不再静默变成空白或 0
-- `macos.2` 修复模型服务延迟加载时余额标记绑定空状态的问题；余额标记等待模型服务就绪后再注册，设置页保持独立可用。
-- `macos.3` 补齐模型目录的 `sessions / remote / remote.session` 依赖，并缓存降级快照，修复真实界面中余额组件的权限错误和 React 循环渲染崩溃。
-
-## 设置页
-
-设置 → 清华算力余额：
-
-- 登录状态、会话有效期、券余额/已用/总额
-- 最近自动刷新时间、最近错误
-- 「立即刷新」：用专用浏览器会话重新取数
-- 「重新登录」：打开专用浏览器窗口，手动走一次清华 SSO（验证码或改密后使用）
-- 「保存凭据」：打开本机凭据对话框，更新账号密码（Windows DPAPI / macOS 钥匙串）
-
-## API 密钥与模型导入
-
-在「清华算力余额」页完成清华登录后，依次选择「连接控制台」→「加载密钥」→ 对应密钥的「导入」。
-主按钮「导入并添加」会保存密钥并添加所选模型，成功后在「模型 → Paratera」及聊天模型选择器中查看。
-已知模型默认不勾选；可用「全选 / 取消全选」一次选中当前筛选结果（最多 200 个），或过滤后逐个勾选。列表为空时，从验证接口自动发现模型再添加（超过 200 个需先明确选择）。
-导入只追加，不会移除已有模型；需要删除或改值请到「模型设置」页逐条处理。
-次按钮「仅保存密钥」不会创建模型供应商条目，不能用它判断模型导入成功；禁用密钥需先启用。
-API 密钥不是付费订阅，本插件不会创建“Codex 订阅”等其他插件的独立页面。
-
-导入时按平台模型广场的「上下文长度」写入上下文窗口（内置 `lib/model-catalog.mjs`，80 个对话/多模态模型），
-视觉模型按广场标签与简介自动勾选「图片」输入；名称直接使用模型 ID，不再带「待校准」。
-最大输出优先用匹配到的在线模型目录（OpenRouter 公开目录，38 个模型有 `max_completion_tokens`），
-未收录时取窗口一半、上限 128K；均可在「模型设置」调整或一键重算。
-控制台可授权的模型未必都在公网 `/v1/models` 中（例如已下线的 ERNIE、Qwen3-Max），这类模型会被跳过并在提示里给出数量，不再让整次导入失败。
-上下文与输出上限都可用 `node scripts/scan-model-catalog.mjs` 联网重新抓取（模型广场 + OpenRouter）。
-
-## 模型设置
-
-「清华算力余额」页内有两个页签：「账号登录」和「模型设置」，不额外占用设置菜单。
-「模型设置」顶部是操作按钮，「一键最大值」把每行设成该模型的最大上下文与最大输出并立即保存，
-旁边是「保存」「重新读取」。
-下面每行可调整名称、上下文窗口、最大输出、输入类型（文本/图片）和思考挡位：
-挡位就是 low / medium / high / xhigh / max 几个复选，**新导入或「恢复推荐值」的模型默认勾选 low / high / max**，
-可逐个增删（点中间的挡位会把它加上）；勾选后写入 `{ off: null, … }`，全部取消则跟随模型原生（不写 `reasoningEfforts`）。
-这里刻意没有“关闭思考”这一档：输入栏的 Off 只是不指定挡位，模型若本身总是思考，Off 也停不下来，所以不做一个名不副实的开关。
-保存走宿主修订号 Settings 接口，只替换 `llm-pi-ai.providers.paratera.models`，
-不会请求平台、不会重新读取密钥，也不会把 `modelOverrides: {}` 等解析默认值写回 profile。
-
-「改名」「新建」「删除」均在插件页面内填写/确认，不依赖 Electron 不支持的 `window.prompt()`。
-改名后点击「保存名称」或在表单内按回车；失败时保留输入并显示局部错误，不再静默无效。
-
-- 按 UUID 选择密钥；跨页查找不会用名称子串误选。同名且页面无法提供可靠身份时会拒绝读取，先在控制台重命名后重试。
-- 完整密钥只在宿主中验证、写入，不返回设置页。验证仅请求模型列表，不发起计费的模型推理。
-- 写入 `PARATERA_API_KEY` 前先备份旧值到 `PARATERA_API_KEY_BACKUP`；读取或备份失败时不覆盖旧值。
-- 选中的模型必须出现在密钥验证返回的可用列表中；不在列表里的会被跳过并计数，全部不可用才报错。模型写入使用 DSH 的修订号 Settings 接口，只提交 `models` 等需要变更的字段（不会把宿主解析出的 `modelOverrides: {}` 等默认值写回），保留其他供应商、`modelOverrides` 及已有模型元数据；不会修改遇到的第一个 `models:` 文本块。
-- 缺失的 Paratera 路由会补齐 OpenAI-compatible 协议和官方 API 地址。新模型的上下文长度取平台模型广场，最大输出默认 8192，可在「模型设置」里微调；这些值不代表已验证的推理能力。
-- 模型配置通过宿主即时更新。若提示「密钥已保存，但模型导入失败」，密钥部分已经完成，可修复模型配置后重试；不会笼统报告全部成功。
-- 浏览器认证可能较慢；连接控制台最多等待 4 分钟、导入最多等待 5 分钟。页面超时/关闭**不保证取消宿主已开始的写入**，请先确认状态，不要立即重复导入。
-- 控制台授权前会清掉浏览器里残留的 `PARA_TOKEN`，只接受本次交换得到的 token；若密钥页仍未落到控制台，会自动再授权一次而不是直接在错误页面上取数（因此不会再出现 `untrusted-console-page`；平台拒绝授权时提示的是登录失败）。
-
-更新插件代码后仍须从托盘完全退出并重启 DSH；上述即时更新指模型配置，不是插件代码热替换。
-当前自动化验证使用隔离数据与已安装宿主 SDK；真实账号的控制台页面和导入结果仍需用户在重启后验收。
-
-## 兼容性
-
-插件没有直接 `import` 任何 `@deepseek-ai/*` 内部包，只通过宿主注入的服务和前端 slot 工作，但这仍然是运行时契约：
-
-- 宿主服务：`webServer`、`credentials`、`connection` 必需；`llm`、`settings` 为可选注入（缺失时余额/密钥仍可用，模型相关功能降级）；
-- 前端：只声明 `slots` 一个注入；`modelDirectories` 改为运行时探测，取不到就用空 store（输入栏标签隐藏，而不是整块客户端崩掉）；
-- 两个 slot（`settings.section` 与 `conversation.input.right`）**独立注册并各自捕获异常**：DSH 若改名其中一个，另一个仍然生效。
-
-升级 DSH 后可以看诊断接口或设置页底部：
-
-```bash
-GET /paratera-balance/api/diagnostics
-# { plugin: { version }, host: { version, compatibility }, services: {...}, client: { ageMs } }
-```
-
-设置页底部会显示宿主和当前插件版本，以及客户端连接状态；若宿主版本超出验证区间（当前 `>=0.2.0 <0.3.0`），这一行会变成橙色并注明未验证。`client.ageMs` 为空表示前端 bundle 没有加载起来。
-
-升级后建议跑一次 `node scripts/verify-host-sdk.mjs --electron '<DSH 可执行文件>'`，再用隔离宿主脚本验证客户端 bundle 与路由。
-
-## 宿主路由
-
-```
-GET  /paratera-balance/api/balance
-GET  /paratera-balance/api/status
-POST /paratera-balance/api/refresh
-POST /paratera-balance/api/login
-POST /paratera-balance/api/credentials
-GET  /paratera-balance/api/console/status
-POST /paratera-balance/api/console/connect
-GET  /paratera-balance/api/keys
-POST /paratera-balance/api/keys/create
-POST /paratera-balance/api/keys/update
-POST /paratera-balance/api/keys/delete
-POST /paratera-balance/api/keys/import
-POST /paratera-balance/api/keys/refresh-models
-GET  /paratera-balance/api/models
-POST /paratera-balance/api/models
-GET  /paratera-balance/api/diagnostics
-POST /paratera-balance/api/diagnostics/hello
-```
-
-全部先过 `connection.requestRejection`；token 和完整 API 密钥只在宿主进程内使用，不下发浏览器。
-余额请求发往 `easycompute.cs.tsinghua.edu.cn`，控制台请求发往 `ai.paratera.com`，
-密钥验证请求发往 `llmapi.paratera.com`；宿主 HTTP 请求禁止携带凭据跟随重定向。
-导入接口接受 `uuid`（优先）或兼容的 `name`，可选 `models: string[]` 和 `dryRun: true`。
-`dryRun` 仍会读取并验证所选密钥，但不写入凭据或模型配置；它不是匿名探测接口。
-
-## 配置
-
-```yaml
-config:
-  cacheMs: 5000   # 余额缓存毫秒数，上限 60000
-```
-
-## Windows 一句话安装（人类或 AI）
-
-```text
-git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance"
-node "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance\scripts\install.mjs"
-```
-
-脚本会按**当前设备的系统**自动选择实现，并在结尾输出 JSON 摘要；重复执行安全：
-
-| 平台 | 凭据存储 | 后台续期 |
-| --- | --- | --- |
-| Windows 10/11 | DPAPI（`~/.dsh/easycompute-credentials.bin`） | 计划任务 `DSH Tsinghua Balance Refresh` |
-| macOS 13+ | Keychain（Swift 助手，需 Xcode Command Line Tools） | launchd agent |
-| 其他 | 不支持，安装器会直接报 `unsupported-platform` | — |
-
-后台任务默认随安装注册；不想注册用 `--no-task`。
-
-校验：
-
-```text
-node scripts\install.mjs --verify   # 期望 "ok": true
-```
-
-给 AI 代理的完整协议见 [AGENTS.md](AGENTS.md)（含前置检查、成功判据、失败处理、凭据边界）。
-
-## 在另一台设备安装（Windows）
-
-前置：Windows 10/11、已安装 Chrome、Node 22+（DSH 自带即可）、DSH 0.2.1-rc.5 及以上。
-
-1. 克隆到任意目录（路径含空格也没问题）：
-   ```text
-   git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git
-   ```
-2. 作为本地链接装进 DSH profile，编辑 `%USERPROFILE%\.dsh\profiles\desktop\package.json`：
-   - `dependencies` 增加 `"dsh-paratera-balance": "link:<克隆路径>"`
-   - `dsh.profile.bundles` 追加 `"dsh-paratera-balance"`
-   然后在 profile 目录执行 `pnpm install`（用 DSH 自带的 pnpm）。
-3. 完全退出并重启 DSH，设置里应出现「清华算力余额」页签。
-4. 点「保存凭据」，输入一次账号密码（DPAPI 加密保存在本机）。
-5. 后台续期任务由安装器按系统自动注册（Windows 计划任务 / macOS launchd），无需手动执行。
-   如需跳过：`node scripts\install.mjs --no-task`。
-6. 自检：
-   ```text
-   node lib\scheduled.mjs
-   ```
-   期望输出 `{"ok":true,...}` 并写入 `~/.dsh/easycompute-session.json`。
-
-## 目录结构
-
-```text
-lib/index.js      宿主插件：路由、余额映射、后台检查
-lib/refresh.mjs   会话刷新、静默登录、浏览器控制
-lib/platform.mjs  Mac / Windows 路径
-lib/macos-credentials.mjs 原生钥匙串辅助程序构建与调用
-lib/client.js     客户端：输入栏小标 + 设置页
-lib/scheduled.mjs 计划任务入口
-scripts/          Swift / PowerShell 凭据窗口、各平台后台任务安装
-tests/            隔离测试及临时 Mac profile 的真实 pnpm 安装测试
-```
-
-## 开发
-
-```text
-npm test                         # 不读取真实凭据，不请求真实余额
-npm run verify:macos              # 隔离启动已安装 DSH，验证真实宿主/客户端/鉴权后自动退出
-npm run verify:chrome             # 临时空白 Chrome：验证启动、复用及窗口关闭后的恢复
-npm run verify:launchd            # 独立临时后台任务：注册、运行、替换、移除，不使用账号
-EASYCOMPUTE_LIVE_TEST=1 node tests/live.mjs  # 用户明确授权后进行真实账号探测
-```
-
-在源码仓库的 Windows 环境中，可额外运行已安装 SDK 契约测试（按实际安装位置替换可执行文件）：
-
-```powershell
-npm run verify:host-sdk -- --electron "D:\DSH\DeepSeek Harness.exe"
-```
-
-该检查使用 Electron 的 Node 模式，不启动另一个 GUI/服务器；只在随机临时目录写入假凭据，
-执行已安装宿主的凭据存储、Settings 修订号校验、配置验证及模型目录读取，并清理临时目录。
-没有提供 SDK 路径时，普通 `npm test` 会跳过此可选测试；不会把 mock 通过当作真实账号登录成功。
-
-Mac 对应命令：
+## 开发与验证
 
 ```sh
-npm run verify:host-sdk -- --electron "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness"
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run verify:host-sdk -- --electron "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness"
+pnpm run verify:macos
+pnpm run verify:chrome
+pnpm run verify:auth
+pnpm run verify:launchd
 ```
 
-运行安装包浏览器渲染测试前，在源码目录执行 `pnpm install`（测试用 jsdom 属于开发依赖）。
-该测试加载本机安装包自身的 React、Cordis、插槽和模型目录服务，在独立 DOM 中断言余额文本实际出现；不启动用户会话，也不使用真实凭据。
+普通测试使用假数据，不读取真实登录凭据；安装包 SDK / 浏览器渲染测试需要本机 DSH，并默认从普通测试中跳过。
+额外验证使用独立 DOM、临时配置或 Chrome profile。`verify:launchd` 会短暂注册独立的测试任务并清理。
+Windows 的宿主 SDK 检查同样支持 `--electron <安装目录中的 DSH 可执行文件>`。
 
-测试用 `--test-force-exit` 运行：插件按设计保留后台定时器，测试结束时不等事件循环清空。
-
-## 许可
-
-MIT
+参考 [架构说明](docs/ARCHITECTURE.md)；许可证为 [MIT](LICENSE)。

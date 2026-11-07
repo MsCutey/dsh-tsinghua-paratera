@@ -90,8 +90,8 @@ test('open/authentication failures release lock; cleanup errors do not override 
 
 test('real shared helpers attach to mocked dynamic endpoint, settle disconnected calls and leave attached browser alive', async () => {
   const port = 49991;
-  const browserPath = '/devtools/browser/MOCK_BROWSER';
-  const pageSocket = `ws://127.0.0.1:${port}/devtools/page/MOCK_PAGE`;
+  const browserPath = '/devtools/browser/MOCK-BROWSER';
+  const pageSocket = `ws://127.0.0.1:${port}/devtools/page/MOCK-PAGE`;
   const events = [];
   const methods = [];
   mock.method(fs, 'mkdirSync', () => {});

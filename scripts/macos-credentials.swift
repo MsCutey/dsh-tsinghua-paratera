@@ -1,10 +1,14 @@
 import AppKit
 import Security
+import CryptoKit
 
 // One item per macOS user; its name is visible in Keychain Access.
+let defaultHome = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dsh").standardizedFileURL.path
+let configuredHome = ProcessInfo.processInfo.environment["DSH_HOME"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0).standardizedFileURL.path } ?? defaultHome
+let namespace = configuredHome == defaultHome ? "" : "." + SHA256.hash(data: Data(configuredHome.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
 let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
-    kSecAttrService as String: "cn.edu.tsinghua.dsh-paratera-balance",
+    kSecAttrService as String: "cn.edu.tsinghua.dsh-paratera-balance" + namespace,
     kSecAttrAccount as String: "easycompute",
 ]
 

@@ -1,123 +1,17 @@
-# AGENTS.md — 安装与维护协议（给 AI 代理）
+# Agent maintenance protocol
 
-本文件是机器可执行的安装说明。人类用户说"帮我装一下这个插件"时，按下面步骤执行，不要即兴发挥。
+本项目是 DSH 的非官方插件，维护 Windows / macOS 兼容实现。
 
-## 目标
-
-把 `dsh-paratera-balance` 链接进 DSH 的 `desktop` profile，使设置页出现「清华算力余额」，
-并在输入栏显示算力券余额。
-
-## 前置条件（先检查，缺一即停）
-
-| 条件 | 检查命令 | 不满足时 |
-| --- | --- | --- |
-| macOS 或 Windows 10/11 | `uname -s` 或 `$env:OS` | 其它平台暂不支持 |
-| Node ≥ 22 | `node --version` | 停止，或改用 DSH 自带 node |
-| DSH profile 存在 | `Test-Path "$env:USERPROFILE\.dsh\profiles\desktop\package.json"` | 停止，请用户先启动一次 DSH |
-| Chrome 已安装 | `Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe"` | 警告：静默登录不可用，仍可手动登录 |
-| git 可用 | `git --version` | 改用下载 zip 的方式 |
-
-Mac 的 Chrome 检查 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，
-也支持 `~/Applications`。首次安装前检查 `xcrun --find swiftc`，缺失时由用户安装 Xcode Command Line Tools。
-Mac DSH profile 位于 `$DSH_HOME/profiles/desktop/package.json`（默认 `~/.dsh`）。
-用户要求开发 Mac 版本时，应实现并验证适配，不因上游仅支持 Windows 而停止。
-
-Mac 使用 `node scripts/install.mjs` 安装；无全局 Node 时使用
-`/Applications/DeepSeek Harness.app/Contents/Resources/runtime/primary-runtime/dependencies/node/bin/node`。
-安装器编译本机钥匙串辅助程序，不访问凭据内容；`--dry-run` 不编译、不修改清单。
-维护时优先使用 Git、CLI 和 API，浏览器仅作没有可用接口时的补充。
-
-## 安装（标准路径，二选一）
-
-**A. 从仓库克隆（推荐）**
-
-```text
-git clone https://git.tsinghua.edu.cn/bbc26/dsh-paratera-balance.git "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance"
-node "%USERPROFILE%\.dsh\plugins\dsh-paratera-balance\scripts\install.mjs"
-```
-
-**B. 已经有本地目录**
-
-```text
-node <插件目录>\scripts\install.mjs
-```
-
-脚本做的事（不要手工重复）：
-
-1. 在 profile 的 `package.json` 写入 `"dsh-paratera-balance": "link:<插件绝对路径>"`（幂等）
-2. 在 `dsh.profile.bundles` 追加 `"dsh-paratera-balance"`（幂等）
-3. 用 DSH 自带的 pnpm 执行 `pnpm install --dir <profile>`
-4. **按系统自动注册后台续期**：Windows 用计划任务，macOS 用 launchd；
-   macOS 上还会编译 Keychain 助手（需要 `xcode-select --install`）
-5. 输出 JSON 摘要（含 `platform`、`task.ok`、`state`）
-
-不想注册后台任务时加 `--no-task`。
-
-## 成功判据（必须逐条核对）
-
-```text
-node <插件目录>\scripts\install.mjs --verify
-```
-
-期望输出 `"ok": true`，且 `linked`、`bundleListed`、`moduleLinked` 均为 `true`。
-
-然后提示用户（不要代替用户操作）：
-
-1. 完全退出并重启 DSH（托盘退出）
-2. 设置 →「清华算力余额」→「保存凭据」，输入一次清华账号密码
-
-## 凭据边界（硬性）
-
-- **不要**读取、打印、复制或修改 `~/.dsh/easycompute-credentials.bin`
-- **不要**向用户索要密码；密码只能由用户在本机对话框输入
-- **不要**在命令行参数、环境变量或日志里传递密码
-- Mac 同样不要通过辅助程序 `read` 模式或其它工具读取、打印真实钥匙串凭据；验证采用 mock，或由用户在本机窗口填写。
-- 不把 `.local/` 的仓库访问私钥或 `.artifacts/` 的本机构建结果加入提交。
-
-## Mac 后台续期（可选）
-
-`node scripts/setup-macos-task.mjs --dry-run` 先预览，安装使用相同命令去掉 `--dry-run`。
-只注册当前用户 LaunchAgent，每 6 小时检查；不使用 sudo。
-单独移除使用 `node scripts/setup-macos-task.mjs --remove`。
-Mac `install.mjs --uninstall` 默认会先移除对应任务；使用 `--no-task` 时跳过任务管理。
-
-## 开发验证
-
-运行 `npm test`，其中 Mac 临时 profile 测试使用真实 pnpm 安装、重复安装、校验和卸载。
-测试不读取真实密码，不访问真实余额接口，不修改用户实际 profile。
-`npm run verify:macos` 用本机已安装 DSH CLI 创建隔离 Web profile，实际检查宿主加载、客户端资源和 200/401/403/405 路由响应，然后自动关闭测试实例。
-该脚本仅需要本机回环监听权限；不要为测试复制真实 DSH 凭据或访问真实余额。
-测试和隔离宿主安装必须加 `--no-task`，不得注册或覆盖真实登录项。
-`npm run verify:launchd` 使用独立临时名称和只写测试标记的脚本验证 launchd，结束后移除该任务；不运行真实续期入口。
-Mac 凭据状态仅调用原生助手 `status`，不使用 `read`；轮询期间等待窗口关闭后才进行登录，取消时保留原有凭据。
-用 `npm run build:macos` 编译 Swift 辅助程序，再运行 `.artifacts/macos-<架构>/credentials --check`；该检查不读取钥匙串。
-真实 DSH 设置页和账号登录需要另行验收，不能用 mock 通过替代。当前记录在 `docs/macos-validation-0.16.1.md`，旧版本记录保留在 `docs/macos-validation.md`。
-
-## 后台续期（可选）
-
-```text
-powershell -NoProfile -ExecutionPolicy Bypass -File <插件目录>\scripts\setup-windows-task.ps1
-```
-
-注册任务 `DSH Tsinghua Balance Refresh`，每 6 小时静默续期。注册后可用
-`Start-ScheduledTask -TaskName 'DSH Tsinghua Balance Refresh'` 立即验证，
-`LastTaskResult` 应为 `0`。
-
-## 失败处理
-
-| 现象 | 处理 |
-| --- | --- |
-| `profile-not-found` | 让用户先启动并退出一次 DSH，再重试 |
-| `pnpm-failed` | 设 `DSH_PNPM=<DSH安装目录>\resources\runtime\primary-runtime\dependencies\pnpm\bin\pnpm.cjs` 后重试 |
-| `--verify` 里 `moduleLinked=false` | 重新执行安装（会重跑 pnpm） |
-| 重启后设置页没有条目 | 检查 bundles 是否包含插件名，再看 DSH 启动日志 |
-| 界面显示「需登录」 | 正常：让用户点「重新登录」，或检查 `~/.dsh/easycompute-state.json` 的 `lastError` |
-| 点「保存凭据」后一直「启动中」且没有窗口 | 0.8.1 的 `detached: true` 会让 console host 直接退出而不执行脚本；0.8.2 已改为普通 spawn + `-WindowStyle Hidden`。升级后仍无窗口就看 `powershell.exe` 进程是否存活 |
-
-## 卸载
-
-```text
-node <插件目录>\scripts\install.mjs --uninstall
-```
-
-仅移除 manifest 条目并重跑 pnpm；不删除凭据、会话和日志文件。
+- 修改前读 README.md、PRIVACY.md、SECURITY.md；遵守用户的具体授权。
+- 不读取、打印、复制真实登录密码、DPAPI 文件、钥匙串密码、API 密钥或浏览器 cookie。不要运行原生助手的 read 模式进行人工调试。
+- 凭据仅由用户在本机原生窗口输入；验证码由用户输入，不通过聊天索要。
+- 测试使用虚构数据和隔离目录；安装到测试 profile 时使用 --no-task，不注册真实登录项。
+- 普通回归运行 pnpm test；宿主 SDK、真实 Chrome、隔离 DSH 和 launchd 验证范围见 README.md，不能以 mock 结果冒充真实账号验收。
+- 插件代码更新后提示用户完全退出并重开 DSH，不擅自退出正在运行的用户应用。
+- Windows 密码使用当前用户 DPAPI；Mac 使用 Keychain。状态检查不得解密密码。
+- 页面传递密码/验证码必须使用受信任域名与固定执行上下文；不得扩大认证域名或自动选择长期信任。
+- 所有宿主路由先经过 connection.requestRejection。响应与缓存按白名单投影，不回传完整密钥、token、原始异常或无关个人信息。
+- 新网络目的地、凭据处理方式或后台行为必须更新隐私说明。
+- 打包仅使用明确允许的文件；不带 .git、.local、.artifacts、node_modules、真实 profile、日志、截图或本机密钥。
+- 公开发布必须扫描实际归档文件及公开提交元数据；不要把内部开发历史直接推到公开仓库。
+- 优先使用 Git、CLI 和 API；只有无法通过相应接口完成的必要步骤才使用浏览器。

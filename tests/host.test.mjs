@@ -6,7 +6,7 @@ import { SESSION_FILE, STATE_FILE } from '../lib/refresh.mjs'
 
 const ORIGIN = 'https://easycompute.cs.tsinghua.edu.cn'
 const session = { token: 'fake-session-token', exp: Date.now() + 6 * 3600 * 1000, capturedAt: Date.now() }
-const validUser = { code: 200, data: { couponFree: 976.9321, couponUsed: 2123.0679, couponTotal: 2000, gpuUsed: 0.14, tokenUsed: 145344533, department: '物理系', clazz: 'X0011' } }
+const validUser = { code: 200, data: { couponFree: 123.4567, couponUsed: 76.5433, couponTotal: 2000, gpuUsed: 0.14, tokenUsed: 12345, department: 'Example Department', clazz: 'EXAMPLE-CLASS' } }
 
 let calls
 let rejection
@@ -41,7 +41,7 @@ beforeEach(() => {
   mock.method(fs, 'mkdirSync', () => { throw new Error('ISOLATION: host tests must not start a browser or touch real state') })
   mock.method(fs, 'readFileSync', (file) => {
     if (file === SESSION_FILE) return JSON.stringify(session)
-    if (file === STATE_FILE) return JSON.stringify({ snapshot: { couponFree: 976.93 }, lastRefreshAt: Date.now() })
+    if (file === STATE_FILE) return JSON.stringify({ snapshot: { couponFree: 123.46 }, lastRefreshAt: Date.now() })
     throw new Error('unexpected read: ' + file)
   })
   mock.method(globalThis, 'fetch', async (url, options = {}) => {
@@ -61,9 +61,10 @@ test('balance reads only the official easycompute endpoint and reports coupon am
   assert.equal(result.headers['Cache-Control'], 'no-store')
   assert.equal(result.body.ok, true)
   assert.equal(result.body.source, 'easycompute')
-  assert.equal(result.body.availableQuota, 976.93)
-  assert.equal(result.body.detail.couponUsed, 2123.07)
-  assert.equal(result.body.account.department, '物理系')
+  assert.equal(result.body.availableQuota, 123.46)
+  assert.equal(result.body.detail.couponUsed, 76.54)
+  assert.equal(result.body.account, undefined)
+  assert.equal(JSON.stringify(result.body).includes(validUser.data.department), false)
   assert.equal(calls.length, 1)
   assert.equal(calls[0].url, ORIGIN + '/auth/userInfo/query')
   assert.equal(calls[0].options.headers.token, 'fake-session-token')
@@ -99,7 +100,7 @@ test('status exposes the session lifetime and last snapshot', async () => {
   assert.equal(result.body.configured, true)
   assert.equal(result.body.tokenValid, true)
   assert.equal(result.body.tokenExpiresAt, session.exp)
-  assert.equal(result.body.snapshot.couponFree, 976.93)
+  assert.equal(result.body.snapshot.couponFree, 123.46)
 })
 
 test('an invalid payload never fabricates a zero balance', async () => {
