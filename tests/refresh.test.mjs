@@ -59,6 +59,7 @@ function noLoginFixture() {
   const effects = [];
   mock.method(fs, 'readFileSync', () => { throw Error('ISOLATION: no stored session'); });
   mock.method(fs, 'existsSync', () => false); // No credential script or Chrome: never spawn.
+  mock.method(fs, 'statSync', () => { throw Object.assign(Error('ISOLATION: no credentials'), { code: 'ENOENT' }); });
   mock.method(fs, 'mkdirSync', () => effects.push('lock-directory'));
   mock.method(fs, 'openSync', () => 99999);
   mock.method(fs, 'writeFileSync', () => {});

@@ -3,7 +3,9 @@
 DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
 登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
-当前版本：**1.0.4**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+当前修复版：**1.0.5-windows.2**（基于上游 **1.0.4**，保留相同功能线）。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+
+Windows 安装、完整卸载、删除修复的实际边界与验证范围，见 [Windows 指南](docs/WINDOWS.md)。这是独立源码修复版，未自动安装或发布到上游。
 
 > **适用范围**：仅适用于通过 `id.tsinghua.edu.cn` 登录的清华算力平台账号（`easycompute.cs.tsinghua.edu.cn`）。
 > Paratera 官方账号或其他高校、企业的 Paratera 接入**不在支持范围**，登录步骤无法通过。
@@ -30,7 +32,7 @@ DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份�
 | 浏览器 | Google Chrome |
 | Mac 首次安装 | Xcode Command Line Tools（`xcode-select --install`） |
 
-已实机验证 Apple Silicon Mac。Windows 有自动化回归，当前发行未在独立 Windows 设备重新完成全部登录流程；Intel Mac 及其他 DSH 版本也需要目标环境验收。诊断中的兼容区间不代表区间内每个版本都逐一实测。
+上游已实机验证 Apple Silicon Mac。本修复版在 Windows 上验证了隔离 profile 的真实 pnpm 安装/卸载、PowerShell 5.1 和已安装 DSH 0.2.1-rc.5 的宿主 SDK。`1.0.5-windows.2` 修正了认证算法错误（SHA-256 → 官网 SparkMD5/MD5）；用户授权复用既有会话后，真实新建→删除临时密钥及列表确认已通过，详见 [根因与验收](docs/KEY-MANAGEMENT.md)。没有重新进行真实账号登录/二次认证、后台任务注册、密码加解密或 Mac 实机验收。诊断兼容区间不代表每个版本都逐一实测。
 
 ## 安装
 
@@ -43,7 +45,14 @@ node scripts/install.mjs
 node scripts/install.mjs --verify
 ```
 
-Windows 可在 PowerShell 中运行相同 Node 命令。安装器会备份 profile 清单，追加本地链接和 bundle，保留其他配置；重复执行不会重复追加。
+Windows 可在 PowerShell 中运行相同 Node 命令，或使用会自动寻找 Node 的专用入口（默认仅预览）：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows.ps1 -Action Install
+```
+
+安装器会备份 profile 清单，追加本地链接和 bundle，保留其他配置；重复执行不会重复追加。
 
 没有全局 Node 时，Mac 可使用：
 
@@ -74,7 +83,9 @@ Windows 使用安装目录中 `resources\runtime\primary-runtime\dependencies\no
 - 密钥导入前先验证模型列表，不发送计费的模型推理；旧密钥在覆盖前交由 DSH 备份。
 - 完整 API 密钥不返回设置页；显示的是 SHA-256 摘要指纹，不包含密钥首尾字符。
 - 模型设置可以调整名称、上下文、最大输出、文本/图片输入及思考挡位；新模型默认 low / high / max。
-- 删除密钥会影响使用该密钥的应用；请仔细确认。创建密钥不等于购买订阅，后续模型调用仍受平台计费规则约束。
+- 删除密钥会影响使用该密钥的应用；请仔细确认。新版已修复请求认证算法差异，并完成真实新建/删除验收；单次 DELETE 后完整分页核验，结果未知时先刷新检查，不盲目重复删除。新建结果未知也须先按名称核实，避免重复创建。详见 [根因与验收](docs/KEY-MANAGEMENT.md)。
+- Windows 账号登录页可二次确认「删除已保存密码」，不解密文件，不会注销会话或撤销 API 密钥。
+- 创建密钥不等于购买订阅，后续模型调用仍受平台计费规则约束。
 
 平台模型广场和公开目录用于生成推荐值，不能保证每个路由实际支持声明的上限；请按目标模型验证。
 
@@ -97,7 +108,9 @@ node scripts/install.mjs --uninstall --purge-profile  # 另外删除专用 Chrom
 
 卸载会做三件事：从 profile 清单移除依赖与 bundle；从 `cordis.patch.yml` 删除插件写入的 `paratera` provider（以及指向它的默认模型条目，如果有），改动前自动备份；删除会话与状态文件（`easycompute-session.json`、`easycompute-state.json`、`paratera-console-session.json`、刷新锁）。
 
-Mac 默认先停止对应后台任务再移除插件；Windows 的后台任务可在任务计划程序中删除。密码不随卸载删除：Mac 在「钥匙串访问」中按 `DSH 清华算力余额` 查找，Windows 为 DSH_HOME 内的 `easycompute-credentials.bin`；需要时手动删除。导入到 DSH 的 API 密钥归宿主所有，删除 provider 不会撤销平台上的密钥，必要时先去平台撤销。卸载后重新安装并导入即可恢复模型配置。
+Mac / Windows 默认先停止并移除对应后台任务，再摘除插件。Windows 默认删除 DSH_HOME 内的 `easycompute-credentials.bin`，`--keep-credentials` 可保留；Mac 密码仍需在「钥匙串访问」中按 `DSH 清华算力余额` 查找并自行删除。`--purge-profile` 使用实际浏览器路径，包括自定义 home。请先手动退出 DSH、专用 Chrome 和凭据窗口。
+
+同一 home 其他 profile 仍安装插件时，保留共享任务和数据，拒绝 purge，避免破坏其他 profile。清理失败会返回非零退出码；复杂手改 YAML 会拒绝自动修改，不假报清理成功。备份、源码与宿主持有的 `PARATERA_API_KEY` / `PARATERA_API_KEY_BACKUP` 有意保留，需分别确认后清理；删除 provider 不会撤销平台密钥。完整范围及限制见 [Windows 卸载指南](docs/WINDOWS.md#卸载)。
 
 ## 隐私与安全
 

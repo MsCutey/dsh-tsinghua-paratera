@@ -1,13 +1,34 @@
 ﻿# Secure one-time credential capture for the DSH balance plugin.
 # The password never leaves this dialog in plaintext: it is encrypted with DPAPI
 # (CurrentUser scope) and written to ~/.dsh/easycompute-credentials.bin
+[CmdletBinding()]
+param(
+  [string]$DshHome = $(if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }),
+  [switch]$Remove,
+  [switch]$DryRun
+)
+$ErrorActionPreference = 'Stop'
+$dshRoot = [System.IO.Path]::GetFullPath($DshHome)
+$out = Join-Path $dshRoot 'easycompute-credentials.bin'
+
+# Removal never loads UI/DPAPI, creates a directory, or reads the blob. Literal
+# paths are essential: a custom home may contain PowerShell wildcard characters.
+if ($Remove) {
+  if ($DryRun) { @{ ok = $true; dryRun = $true; remove = $true } | ConvertTo-Json -Compress; return }
+  $item = $null
+  try { $item = Get-Item -LiteralPath $out -Force -ErrorAction Stop }
+  catch [System.Management.Automation.ItemNotFoundException] { }
+  if ($null -ne $item) {
+    if ($item.PSIsContainer -or ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { throw 'Credential path must be a regular file.' }
+    Remove-Item -LiteralPath $out -Force -ErrorAction Stop
+  }
+  @{ ok = $true; removed = ($null -ne $item) } | ConvertTo-Json -Compress
+  return
+}
+if ($DryRun) { @{ ok = $true; dryRun = $true; remove = $false } | ConvertTo-Json -Compress; return }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Security
-
-$ErrorActionPreference = 'Stop'
-$dshRoot = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
 [System.IO.Directory]::CreateDirectory($dshRoot) | Out-Null
-$out = Join-Path $dshRoot 'easycompute-credentials.bin'
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = '清华算力凭据（仅本机加密保存）'
@@ -72,17 +93,37 @@ if ([string]::IsNullOrWhiteSpace($user) -or [string]::IsNullOrEmpty($pass)) {
   exit 1
 }
 
-$json = @{ username = $user; password = $pass } | ConvertTo-Json -Compress
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-$protected = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
-[System.IO.File]::WriteAllBytes($out, $protected)
-
-# lock the file down to the current user
-$acl = Get-Acl $out
-$acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, 'FullControl', 'Allow')
-$acl.SetAccessRule($rule)
-Set-Acl $out $acl
-
-Write-Output ('SAVED ' + $out + ' (' + $protected.Length + ' bytes)')
-$textPass.Clear()
+$temporary = Join-Path $dshRoot ('easycompute-credentials.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+$bytes = $null
+try {
+  $json = @{ username = $user; password = $pass } | ConvertTo-Json -Compress
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+  $protected = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+  # Apply a fresh ACL by SID before writing the encrypted payload, then replace
+  # atomically. Failure leaves any previous credential intact.
+  $stream = [System.IO.File]::Open($temporary, [System.IO.FileMode]::CreateNew)
+  $stream.Dispose()
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+  $acl = New-Object System.Security.AccessControl.FileSecurity
+  $acl.SetOwner($sid)
+  $acl.SetAccessRuleProtection($true, $false)
+  $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'Allow')
+  $acl.SetAccessRule($rule)
+  Set-Acl -LiteralPath $temporary -AclObject $acl
+  [System.IO.File]::WriteAllBytes($temporary, $protected)
+  if (Test-Path -LiteralPath $out) {
+    $existing = Get-Item -LiteralPath $out -Force
+    if ($existing.PSIsContainer -or ($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { throw 'Credential path must be a regular file.' }
+    # Replace preserves destination metadata, so tighten its ACL as well.
+    Set-Acl -LiteralPath $out -AclObject $acl
+    [System.IO.File]::Replace($temporary, $out, $null)
+  } else { [System.IO.File]::Move($temporary, $out) }
+  Write-Output 'SAVED'
+} finally {
+  if ($null -ne $bytes) { [Array]::Clear($bytes, 0, $bytes.Length) }
+  $json = $null
+  $pass = $null
+  $textPass.Clear()
+  $form.Dispose()
+  if ([System.IO.File]::Exists($temporary)) { Remove-Item -LiteralPath $temporary -Force }
+}

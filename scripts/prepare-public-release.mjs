@@ -23,7 +23,7 @@ const assets = path.join(destination, 'assets');
 fs.mkdirSync(tree, { recursive: true }); fs.mkdirSync(assets);
 
 const files = ['.gitattributes', '.gitignore', 'README.md', 'AGENTS.md', 'LICENSE', 'PRIVACY.md', 'SECURITY.md', 'CHANGELOG.md', 'package.json', 'pnpm-lock.yaml',
-  'docs/ARCHITECTURE.md', 'docs/SECURITY-AUDIT.md'];
+  'docs/ARCHITECTURE.md', 'docs/SECURITY-AUDIT.md', 'docs/WINDOWS.md', 'docs/VALIDATION.md', 'docs/KEY-MANAGEMENT.md'];
 for (const folder of ['lib', 'scripts', 'tests', '.github']) {
   const visit = (dir) => {
     if (!fs.existsSync(path.join(root, dir))) return;

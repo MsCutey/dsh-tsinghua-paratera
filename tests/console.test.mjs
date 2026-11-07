@@ -226,13 +226,82 @@ test('console requests sign mock token, bound timeout, and forbid redirect forwa
       assert.equal(url, CONSOLE_ORIGIN + '/lms/api/key/llmSk');
       assert.equal(options.redirect, 'error');
       assert.equal(options.headers.token, session.token);
-      assert.equal(options.headers['Ai-Authorization'], 'Bearer ' + crypto.createHash('sha256').update(session.token).digest('hex'));
+      assert.equal(options.headers['Ai-Authorization'], 'Bearer ' + crypto.createHash('md5').update(session.token).digest('hex'));
+      assert.match(options.headers['Ai-Authorization'], /^Bearer [0-9a-f]{32}$/);
       assert.equal(options.body, '{"pageNum":1}');
       assert.ok(options.signal instanceof AbortSignal);
       return new Response(JSON.stringify({ code: '200', data: { rows: [] } }));
     },
   });
   assert.deepEqual(result.data, { rows: [] });
+});
+
+test('authentication matches fixed vectors from the official SparkMD5 implementation, not a self-referential hash expectation', async () => {
+  const vectors = [
+    ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+    ['FAKE.PUBLIC.RESEARCH.TOKEN', '3568428af04729d163c4c1c87dab3d9a'],
+    ['FAKE-中文', '6b9e80b09a1e69f6c286ce4f049a13b4'],
+    ['令牌-🔑', '4f8326c0152c4d6220c53270be3a9c7d'],
+  ];
+  for (const [token, expected] of vectors) {
+    for (const [endpoint, method] of [['create', 'POST'], ['delete', 'DELETE']]) {
+      const result = await consoleFetch('/lms/api/key/' + endpoint, {
+        read: () => ({ token }), method, body: { tokenUuid: 'FAKE+ID/==' },
+        fetchImpl: async (_, options) => {
+          assert.equal(options.headers.token, token);
+          assert.equal(options.headers['Ai-Authorization'], 'Bearer ' + expected);
+          return new Response('{"code":200,"data":null}');
+        },
+      });
+      assert.equal(result.ok, true);
+    }
+  }
+  for (const invalid of [null, {}, { token: '' }, { token: 42 }]) {
+    assert.deepEqual(await consoleFetch('/lms/api/key/create', { read: () => invalid, fetchImpl: () => assert.fail('missing token must not send empty MD5') }), { ok: false, error: 'console-session-missing' });
+  }
+});
+
+test('DELETE transport matches the public console JSON contract without query conversion or redirects', async () => {
+  const uuid = 'AAAA+BBBB/CCCC==';
+  let requests = 0;
+  const result = await consoleFetch('/lms/api/key/delete', {
+    read: () => session, method: 'DELETE', body: { tokenUuid: uuid },
+    fetchImpl: async (url, options) => {
+      requests += 1;
+      assert.equal(url, CONSOLE_ORIGIN + '/lms/api/key/delete');
+      assert.equal(new URL(url).search, '');
+      assert.equal(options.method, 'DELETE');
+      assert.equal(options.redirect, 'error');
+      assert.equal(options.headers['Content-Type'], 'application/json');
+      assert.equal(options.body, JSON.stringify({ tokenUuid: uuid }));
+      return new Response('{"code":200,"data":null}');
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(requests, 1);
+});
+
+test('DELETE transport never retries a rejected or disconnected request or exposes response details', async () => {
+  for (const mode of ['server-error', 'network-error', 'timeout', 'invalid-response']) {
+    let requests = 0;
+    const result = await consoleFetch('/lms/api/key/delete', {
+      read: () => session, method: 'DELETE', body: { tokenUuid: 'TEST_OPAQUE_ID' },
+      fetchImpl: async () => {
+        requests += 1;
+        if (mode === 'server-error') return new Response('{"message":"TEST_SECRET"}', { status: 500 });
+        if (mode === 'invalid-response') return new Response('TEST_SECRET');
+        const error = Error('TEST_SECRET');
+        error.name = mode === 'timeout' ? 'TimeoutError' : 'TypeError';
+        throw error;
+      },
+    });
+    assert.equal(requests, 1);
+    assert.deepEqual(result, { ok: false, error: {
+      'server-error': 'console-http-500', 'network-error': 'console-network-error',
+      timeout: 'console-timeout', 'invalid-response': 'console-invalid-response',
+    }[mode] });
+    assert.doesNotMatch(JSON.stringify(result), /TEST_SECRET|TEST_OPAQUE_ID/);
+  }
 });
 
 test('console path validation rejects non-LMS, cross-origin and normalization tricks before session reads', async () => {
