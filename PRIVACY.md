@@ -26,7 +26,7 @@
 
 ## 清理与反馈
 
-先退出专用 Chrome，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 密码可在钥匙串访问中删除 `DSH 清华算力（Paratera）` 条目；Windows 可删除对应 DPAPI blob。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
+先退出专用 Chrome，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 密码可在钥匙串访问中删除 `DSH 清华算力余额` 条目；Windows 可删除对应 DPAPI blob。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
 
 不要在公开 issue、日志、截图或打包文件中提供密码、验证码、完整密钥、cookie、token、个人 profile 或未脱敏账户信息。
 

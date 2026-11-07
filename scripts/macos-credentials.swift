@@ -69,7 +69,7 @@ func storeCredentials() {
     if status == errSecItemNotFound {
         var item = query
         item[kSecValueData as String] = data
-        item[kSecAttrLabel as String] = "DSH 清华算力（Paratera）"
+        item[kSecAttrLabel as String] = "DSH 清华算力余额"
         status = SecItemAdd(item as CFDictionary, nil)
     }
     let notice = NSAlert()
