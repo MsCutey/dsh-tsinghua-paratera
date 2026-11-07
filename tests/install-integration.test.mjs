@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-test('temporary Mac profile installs, verifies, reinstalls, and uninstalls through real pnpm', { skip: process.platform !== 'darwin' }, () => {
+test('temporary native profile installs, verifies, reinstalls, and uninstalls through real pnpm', { skip: !['darwin', 'win32'].includes(process.platform) }, () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'balance-install-中文 '));
   const profile = path.join(home, 'profiles', 'desktop');
   const manifestPath = path.join(profile, 'package.json');
@@ -28,10 +28,18 @@ test('temporary Mac profile installs, verifies, reinstalls, and uninstalls throu
     const installed = run();
     assert.equal(installed.ok, true);
     assert.equal(installed.state.moduleLinked, true);
-    assert.equal(fs.statSync(installed.backup).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(installed.backup).mode & 0o777, 0o600);
     assert.equal(run('--verify').ok, true);
     assert.equal(run().changed, false);
-    assert.equal(run('--uninstall').ok, true);
+    fs.writeFileSync(path.join(home, 'easycompute-session.json'), '{"token":"fake-test-only"}');
+    fs.writeFileSync(path.join(home, 'easycompute-credentials.bin'), 'fake-not-dpapi');
+    fs.mkdirSync(path.join(home, 'browser-profile'));
+    fs.writeFileSync(path.join(home, 'browser-profile', 'fake-cookie'), 'test-only');
+    assert.equal(run('--uninstall', '--purge-profile').ok, true);
+    assert.equal(fs.existsSync(path.join(home, 'easycompute-session.json')), false);
+    if (process.platform === 'win32') assert.equal(fs.existsSync(path.join(home, 'easycompute-credentials.bin')), false);
+    assert.equal(fs.existsSync(path.join(home, 'browser-profile')), false);
+    assert.equal(run('--uninstall', '--purge-profile').ok, true);
     const restored = JSON.parse(fs.readFileSync(manifestPath));
     assert.deepEqual(restored.dsh.profile.bundles, ['existing-bundle']);
     assert.deepEqual(restored.preserved, { test: true });

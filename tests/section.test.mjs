@@ -314,6 +314,166 @@ test('cancelling Mac credential rotation preserves the old credential without au
   f.dispose()
 })
 
+const credentialDeletes = (f) => f.requests.filter((r) => r.url === '/tsinghua-paratera/api/credentials' && r.options.method === 'DELETE')
+const forgetChoice = (f, choice) => walk(f.byKey('forget-confirm')).find((node) => node.props.key === choice)
+const loginRequests = (f) => f.requests.filter((r) => ['/tsinghua-paratera/api/login', '/tsinghua-paratera/api/refresh'].includes(r.url))
+
+for (const status of [{ saved: false, canRemove: true }, { saved: true, canRemove: false }, { saved: true }, { saved: true, canRemove: 'true' }]) {
+  test(`saved password removal is hidden without an explicit capability and saved state: ${JSON.stringify(status)}`, async () => {
+    const f = fixture((r) => r.url.endsWith('/credentials/status') ? response(status) : undefined)
+    await tick()
+    assert.equal(f.find((node) => node.props.key === 'forget'), undefined)
+    assert.equal(credentialDeletes(f).length, 0)
+    f.dispose()
+  })
+}
+
+test('saved password removal opens an in-page confirmation and cancellation sends no deletion', async () => {
+  const f = fixture((r) => r.url.endsWith('/credentials/status') ? response({ saved: true, canRemove: true }) : undefined)
+  await tick()
+  f.click('forget')
+  assert.match(text(f.byKey('forget-confirm')), /仅删除本机保存的登录密码.*不会退出平台会话或撤销 API 密钥/)
+  assert.equal(credentialDeletes(f).length, 0)
+  forgetChoice(f, 'no').props.onClick()
+  assert.equal(f.find((node) => node.props.key === 'forget-confirm'), undefined)
+  assert.ok(f.byKey('forget'))
+  assert.equal(credentialDeletes(f).length, 0)
+  assert.equal(loginRequests(f).length, 0)
+  assert.equal(f.nativeDialogCalls, 0)
+  f.dispose()
+})
+
+test('saved password removal confirms once, deduplicates clicks, and never logs in or refreshes a session', async () => {
+  const pending = deferred()
+  let saved = true
+  const f = fixture(async (r) => {
+    if (r.url.endsWith('/credentials/status')) return response({ saved, canRemove: true })
+    if (r.url.endsWith('/api/credentials') && r.options.method === 'DELETE') {
+      const result = await pending.promise
+      saved = false
+      return result
+    }
+  })
+  await tick()
+  f.click('forget')
+  const confirm = forgetChoice(f, 'yes').props.onClick
+  const one = confirm(), two = confirm()
+  assert.equal(credentialDeletes(f).length, 1)
+  assert.deepEqual(credentialDeletes(f)[0].body, { confirm: true })
+  assert.equal(credentialDeletes(f)[0].options.credentials, 'same-origin')
+  assert.equal(forgetChoice(f, 'yes').props.disabled, true)
+  assert.equal(f.byKey('cred').props.disabled, true)
+  pending.resolve(response({ ok: true }))
+  await Promise.all([one, two])
+  assert.equal(credentialDeletes(f).length, 1)
+  assert.equal(f.find((node) => node.props.key === 'forget-confirm'), undefined)
+  assert.equal(f.find((node) => node.props.key === 'forget'), undefined)
+  assert.match(f.text(), /已删除本机保存的登录密码.*现有登录会话和 API 密钥未撤销/)
+  assert.equal(loginRequests(f).length, 0)
+  assert.equal(f.nativeDialogCalls, 0)
+  assert.equal(f.timers.size, 0)
+  f.dispose()
+})
+
+for (const [mode, failure] of [
+  ['application rejection', () => response({ ok: false, error: 'credential-remove-failed' })],
+  ['HTTP rejection', () => response({ ok: false, error: 'credential-remove-failed' }, 500)],
+  ['network failure', () => { throw new TypeError('TEST_FAKE_NETWORK') }],
+  ['invalid response', () => ({ ok: true, json: async () => { throw Error('TEST_FAKE_JSON') } })],
+]) {
+  test(`saved password ${mode} preserves confirmation and saved state without retrying or logging in`, async () => {
+    const f = fixture((r) => r.url.endsWith('/credentials/status') ? response({ saved: true, canRemove: true })
+      : r.url.endsWith('/api/credentials') && r.options.method === 'DELETE' ? failure() : undefined)
+    await tick()
+    f.click('forget')
+    await forgetChoice(f, 'yes').props.onClick()
+    assert.equal(credentialDeletes(f).length, 1)
+    assert.ok(f.byKey('forget'))
+    assert.ok(f.byKey('forget-confirm'))
+    assert.equal(forgetChoice(f, 'yes').props.disabled, false)
+    assert.doesNotMatch(f.text(), /已删除本机保存的登录密码|TEST_FAKE/)
+    assert.equal(loginRequests(f).length, 0)
+    forgetChoice(f, 'no').props.onClick()
+    assert.equal(credentialDeletes(f).length, 1)
+    f.dispose()
+  })
+}
+
+test('a browser-side create deadline preserves the draft and requests name verification without resubmitting', async () => {
+  const pending = deferred()
+  const f = await loaded((r) => r.url.endsWith('/keys/create') ? pending.promise : undefined)
+  f.click('create')
+  f.name('fake-create-timeout-draft')
+  const task = f.submit()
+  const sent = f.requests.find((r) => r.url.endsWith('/keys/create'))
+  assert.deepEqual(sent.body, { name: 'fake-create-timeout-draft' })
+  f.fireTimer(30000)
+  assert.equal(sent.options.signal.aborted, true)
+  pending.resolve(response({ ok: true }))
+  await task
+  await tick()
+  assert.equal(f.requests.filter((r) => r.url.endsWith('/keys/create')).length, 1)
+  assert.match(text(f.byKey('editor-error')), /新建结果尚未确认.*先刷新列表.*名称核实.*不要直接重复新建/)
+  assert.match(text(f.byKey('key-notice')), /新建结果尚未确认/)
+  assert.doesNotMatch(text(f.byKey('editor-error')), /请稍后重试|操作完成/)
+  assert.equal(f.byKey('key-name').props.value, 'fake-create-timeout-draft')
+  assert.equal(f.byKey('editor-submit').props.disabled, false)
+  assert.ok(f.byKey('key-editor'))
+  assert.equal(keyRequests(f).length, 1)
+  assert.equal(f.timers.size, 0)
+  f.dispose()
+})
+
+test('server key-create-unconfirmed preserves the draft and requests name verification without resubmitting', async () => {
+  const f = await loaded((r) => r.url.endsWith('/keys/create') ? response({ ok: false, error: 'key-create-unconfirmed' }) : undefined)
+  f.click('create')
+  f.name('fake-create-unconfirmed-draft')
+  await f.submit()
+  await tick()
+  const creates = f.requests.filter((r) => r.url.endsWith('/keys/create'))
+  assert.equal(creates.length, 1)
+  assert.deepEqual(creates[0].body, { name: 'fake-create-unconfirmed-draft' })
+  assert.match(text(f.byKey('editor-error')), /新建结果尚未确认.*先刷新列表.*名称核实.*不要直接重复新建/)
+  assert.match(text(f.byKey('key-notice')), /新建结果尚未确认/)
+  assert.doesNotMatch(text(f.byKey('editor-error')), /请稍后重试|操作完成/)
+  assert.equal(f.byKey('key-name').props.value, 'fake-create-unconfirmed-draft')
+  assert.equal(f.byKey('editor-submit').props.disabled, false)
+  assert.ok(f.byKey('key-editor'))
+  assert.equal(keyRequests(f).length, 2, 'only the normal read-only refresh follows the failed mutation')
+  assert.equal(f.timers.size, 0)
+  f.dispose()
+})
+
+test('a browser-side delete deadline reports an unknown outcome, preserves confirmation and never resubmits', async () => {
+  const pending = deferred()
+  const f = await loaded((r) => r.url.endsWith('/keys/delete') ? pending.promise : undefined)
+  f.click('del')
+  const task = f.submit()
+  const sent = f.requests.find((r) => r.url.endsWith('/keys/delete'))
+  f.fireTimer(30000)
+  assert.equal(sent.options.signal.aborted, true)
+  pending.resolve(response({ ok: true }))
+  await task
+  assert.equal(f.requests.filter((r) => r.url.endsWith('/keys/delete')).length, 1)
+  assert.match(text(f.byKey('editor-error')), /删除结果尚未确认.*先刷新列表.*不要直接重复删除/)
+  assert.match(text(f.byKey('key-notice')), /删除结果尚未确认/)
+  assert.doesNotMatch(text(f.byKey('editor-error')), /请稍后重试|解析数据失败|与插件请求格式无关/)
+  assert.ok(f.byKey('key-editor'))
+  assert.equal(keyRequests(f).length, 1)
+  f.dispose()
+})
+
+for (const error of ['key-delete-not-deleted', 'key-delete-unconfirmed']) {
+  test(`delete ${error} displays a neutral verification message without claiming a platform fault`, async () => {
+    const f = await loaded((r) => r.url.endsWith('/keys/delete') ? response({ ok: false, error }) : undefined)
+    f.click('del'); await f.submit()
+    assert.match(text(f.byKey('editor-error')), /尚未确认删除|删除结果尚未确认/)
+    assert.doesNotMatch(text(f.byKey('editor-error')), /与插件请求格式无关|解析数据失败/)
+    assert.equal(f.requests.filter((r) => r.url.endsWith('/keys/delete')).length, 1)
+    f.dispose()
+  })
+}
+
 test('StrictMode effect replay does not allow an aborted status request to overwrite current state', async () => {
   const pending = deferred()
   let statuses = 0

@@ -1,8 +1,8 @@
 {
   "name": "dsh-tsinghua-paratera",
-  "version": "1.0.4",
+  "version": "1.0.5-macos.1",
   "scripts": {
-    "test": "node --test --test-force-exit tests/*.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "install:dsh": "node scripts/install.mjs",
     "verify:dsh": "node scripts/install.mjs --verify",
     "verify:macos": "node scripts/verify-dsh-macos.mjs",
@@ -14,7 +14,8 @@
     "build:macos": "node --input-type=module -e \"import {buildCredentialHelper} from './lib/macos-credentials.mjs'; console.log(await buildCredentialHelper())\"",
     "verify:privacy": "node --test tests/privacy.test.mjs",
     "verify:auth": "node scripts/verify-auth-isolation.mjs",
-    "release:prepare": "node scripts/prepare-public-release.mjs"
+    "release:prepare": "node scripts/prepare-public-release.mjs",
+    "verify:keys:live": "node scripts/verify-key-lifecycle.mjs"
   },
   "private": true,
   "description": "DSH 非官方清华算力（Paratera）插件：统一身份认证登录与续期、算力券余额、控制台 API 密钥管理、模型导入与参数设置",
@@ -41,7 +42,11 @@
     "PRIVACY.md",
     "SECURITY.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/verify-key-lifecycle.mjs",
+    "docs/MACOS.md",
+    "docs/VALIDATION.md",
+    "docs/KEY-MANAGEMENT.md"
   ],
   "dsh": {
     "bundle": {
@@ -70,5 +75,13 @@
   ],
   "devDependencies": {
     "jsdom": "26.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MsCutey/dsh-tsinghua-paratera.git"
+  },
+  "homepage": "https://github.com/MsCutey/dsh-tsinghua-paratera",
+  "bugs": {
+    "url": "https://github.com/MsCutey/dsh-tsinghua-paratera/issues"
   }
 }

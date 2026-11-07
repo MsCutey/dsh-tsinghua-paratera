@@ -141,7 +141,9 @@ test('uninstall keeps other providers and unrelated default models', () => {
 test('plugin data paths cover session files and the dedicated Chrome profile', () => {
   const mac = pluginDataPaths('/tmp/home/.dsh', 'darwin', '/Users/example')
   assert.ok(mac.sessionFiles.every((file) => file.startsWith('/tmp/home/.dsh/')))
-  assert.equal(mac.chromeProfile, '/Users/example/Library/Application Support/DSH Tsinghua Paratera')
+  assert.equal(mac.chromeProfile, '/tmp/home/.dsh/browser-profile')
+  assert.equal(pluginDataPaths('/Users/example/.dsh', 'darwin', '/Users/example').chromeProfile, '/Users/example/Library/Application Support/DSH Tsinghua Paratera/Chrome')
   const win = pluginDataPaths('C:\\dsh', 'win32', 'C:\\Users\\example', { LOCALAPPDATA: 'C:\\Users\\example\\AppData\\Local' })
-  assert.equal(win.chromeProfile, 'C:\\Users\\example\\AppData\\Local\\dsh-tsinghua-paratera-profile')
+  assert.equal(win.chromeProfile, 'C:\\dsh\\browser-profile')
+  assert.deepEqual(win.credentialFiles, ['C:\\dsh\\easycompute-credentials.bin'])
 })

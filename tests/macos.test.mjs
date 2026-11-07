@@ -19,7 +19,7 @@ test('Mac uses system/user Chrome apps and an isolated Application Support profi
   // path.resolve() prefixes a drive on Windows, so only the suffix is host-independent.
   assert.ok(posix(value.sessionFile).endsWith('/easycompute-session.json'));
   assert.ok(posix(value.dshHome).endsWith('/test dsh'));
-  assert.equal(value.profileDir, path.join(value.dshHome, 'browser-profile'));
+  assert.equal(value.profileDir, path.posix.join(value.dshHome, 'browser-profile'));
   assert.equal(posix(platformPaths('darwin', '/Users/Example', {}).profileDir), '/Users/Example/Library/Application Support/DSH Tsinghua Paratera/Chrome');
   assert.ok(value.chromeCandidates.map(posix).includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(value.chromeCandidates.map(posix).includes('/Users/测试 User/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
@@ -27,9 +27,10 @@ test('Mac uses system/user Chrome apps and an isolated Application Support profi
 });
 
 test('Windows retains Chrome and LOCALAPPDATA profile locations', () => {
-  const value = platformPaths('win32', '/home/test', { LOCALAPPDATA: '/custom-local' });
-  assert.equal(posix(value.profileDir), '/custom-local/dsh-tsinghua-paratera-profile');
-  assert.ok(value.chromeCandidates.map(posix).includes('/custom-local/Google/Chrome/Application/chrome.exe'));
+  const value = platformPaths('win32', 'C:/Users/test', { LOCALAPPDATA: 'C:/custom-local' });
+  const windowsToPosix = (value) => value.replaceAll('\\', '/');
+  assert.equal(windowsToPosix(value.profileDir), 'C:/custom-local/dsh-tsinghua-paratera-profile');
+  assert.ok(value.chromeCandidates.map(windowsToPosix).includes('C:/custom-local/Google/Chrome/Application/chrome.exe'));
 });
 
 test('Mac credential lookup never invokes PowerShell and handles locked/missing items', async () => {

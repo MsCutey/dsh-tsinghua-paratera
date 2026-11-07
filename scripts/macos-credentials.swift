@@ -79,10 +79,23 @@ func storeCredentials() {
     if status != errSecSuccess { exit(1) }
 }
 
+func deleteCredentials() {
+    // Deletion never reads or decrypts the stored secret. errSecItemNotFound is
+    // success so repeated removal and uninstall stay idempotent.
+    let status = SecItemDelete(query as CFDictionary)
+    if status == errSecSuccess || status == errSecItemNotFound {
+        print("{\"ok\":true}")
+        exit(0)
+    }
+    print("{\"ok\":false,\"code\":\(status)}")
+    exit(1)
+}
+
 switch CommandLine.arguments.dropFirst().first {
 case "read": readCredentials()
 case "status": credentialStatus()
 case "store": storeCredentials()
+case "delete": deleteCredentials()
 case "--check": print("{\"ok\":true,\"backend\":\"macOS Keychain\"}")
 default: exit(2)
 }

@@ -19,16 +19,20 @@
 - **登录密码**：可选。Mac 保存在当前用户 Keychain；Windows 用当前用户 DPAPI 加密保存。状态轮询仅检查存在性，不返回密码。自定义 `DSH_HOME` 使用独立命名空间/文件。
 - **短期 token**：位于 `DSH_HOME/easycompute-session.json` 和 `paratera-console-session.json`；是 bearer token，不是匿名数据。Unix 新写文件为 `0600`，专用目录为 `0700`。普通缓存文件没有额外应用层加密，请保护 OS 用户账户和磁盘。
 - **余额缓存**：`easycompute-state.json` 只保存必要数值、时间、固定错误码和操作布尔值；不保留院系、班级或用户 UUID。新版写入时会丢弃旧状态中的非白名单字段。
-- **API 密钥**：导入后交给 DSH 凭据服务。宿主可能使用本地凭据文件，不能把“只在宿主保存”理解成硬件加密。插件不直接回传完整值，显示的指纹是哈希摘要。
+- **API 密钥**：导入后交给 DSH 凭据服务。宿主可能使用本地凭据文件，不能把“只在宿主保存”理解成硬件加密。插件不直接回传完整值，显示的指纹是哈希摘要。删除密钥只发一次控制台请求，随后完整分页只读核验；核验失败不等同于删除成功或失败。
 - **Chrome profile**：与日常浏览器分开，仍包含登录 cookie、站点存储及浏览器历史。默认 Mac 路径是 `~/Library/Application Support/DSH Tsinghua Paratera/Chrome`；Windows 为 `%LOCALAPPDATA%/dsh-tsinghua-paratera-profile`。自定义 home 使用 `DSH_HOME/browser-profile`。
 
 后台续期默认关闭，使用 `--task` 主动开启。信任浏览器默认不选中，用户可明确选择平台提供的长期信任。关闭插件/卸载并不自动注销平台会话。
 
 ## 清理与反馈
 
-先退出专用 Chrome，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 密码可在钥匙串访问中删除 `DSH 清华算力余额` 条目；Windows 可删除对应 DPAPI blob。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
+先完全退出 DSH、专用 Chrome 和凭据窗口，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 可在设置页二次确认删除已保存密码，或卸载时默认清理；`--keep-credentials` 可保留。删除只移除对应 Keychain 条目，不读取/解密内容，不注销现有会话或撤销 API 密钥；凭据窗口打开时拒绝删除。Windows 卸载默认清理 DPAPI blob，`--keep-credentials` 可保留。
 
-不要在公开 issue、日志、截图或打包文件中提供密码、验证码、完整密钥、cookie、token、个人 profile 或未脱敏账户信息。
+卸载默认清理会话、状态、锁和已知临时文件；`--purge-profile` 额外删除实际使用的专用浏览器目录。同 home 仍有其他 profile 安装插件时，自动保留共享数据和任务并拒绝 purge。清理失败明确报错，不会强杀应用或注销平台会话。恢复备份与源码目录有意保留；DSH 持有的 `PARATERA_API_KEY` / `PARATERA_API_KEY_BACKUP` 需经宿主单独管理。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
+
+控制台认证头使用官网既有 `Bearer MD5(token)` 协议，不读取浏览器 cookie、不放宽重定向；这不是密码存储方式变更。未增加网络目的地或遥测。新增可选密钥生命周期验收脚本，默认不读取会话或联网，只有 `--live --confirm-create-delete` 双开关才通过插件正常消费既有会话；在明确授权下只创建一个随机专用名的新密钥、完整基线核验后删除一次，并同时检查 UUID 和名称缺席。不显示/导入完整密钥、不执行模型推理、不自动重试变更。
+
+不要在公开 issue、日志、截图或打包文件中提供密码、验证码、完整密钥、cookie、token、个人 profile 或未脱敏账户信息。密钥生命周期脚本的可选回执只含临时密钥标识、名称与阶段，并保存在排除发布的 `.artifacts` 中。
 
 ## 安全边界
 
