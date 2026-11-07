@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { createPlugin } from '../lib/index.js';
 import { importKey } from '../lib/import.mjs';
 
-const ROUTE = '/paratera-balance/api/keys/import';
+const ROUTE = '/tsinghua-paratera/api/keys/import';
 const SECRET = 'sk-test-only-route-secret-0123456789';
 const PREVIOUS = 'sk-test-only-route-previous-9876543210';
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };

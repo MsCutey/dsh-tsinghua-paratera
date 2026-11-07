@@ -53,7 +53,7 @@ async function main() {
     });
     const base = new URL(launch).origin;
     const request = (endpoint, options = {}) => fetch(base + endpoint, { redirect: 'manual', signal: AbortSignal.timeout(5000), ...options });
-    const endpoint = '/paratera-balance/api/status';
+    const endpoint = '/tsinghua-paratera/api/status';
     const anonymous = await request(endpoint);
     check(anonymous.status === 401, 'unauthenticated status request must be 401');
     const foreign = await request(endpoint, { headers: { origin: 'https://untrusted.invalid' } });
@@ -67,37 +67,37 @@ async function main() {
     const body = await status.json();
     check(status.status === 200 && body.ok && body.source === 'easycompute', 'plugin did not return its status');
     check(body.configured === false && body.snapshot === null, 'isolated home must not contain a real session');
-    const hello = await request('/paratera-balance/api/diagnostics/hello', { method: 'POST', headers });
+    const hello = await request('/tsinghua-paratera/api/diagnostics/hello', { method: 'POST', headers });
     check(hello.status === 200, 'diagnostics hello failed');
-    const diagnostics = await (await request('/paratera-balance/api/diagnostics', { headers })).json();
+    const diagnostics = await (await request('/tsinghua-paratera/api/diagnostics', { headers })).json();
     check(diagnostics.ok && diagnostics.host.platform === 'darwin' && diagnostics.host.compatibility.ok === true, 'Mac host compatibility was not recognised');
     check(diagnostics.services.settings && diagnostics.services.llm && Number.isFinite(diagnostics.client.ageMs), 'new host services or heartbeat are unavailable');
-    const modelState = await (await request('/paratera-balance/api/models', { headers })).json();
+    const modelState = await (await request('/tsinghua-paratera/api/models', { headers })).json();
     check(modelState.ok && Array.isArray(modelState.models) && modelState.models.length === 0, 'isolated model list was not empty');
     const sample = recommendedModel('test-only/mac-model');
-    const writeModels = (revision) => request('/paratera-balance/api/models', {
+    const writeModels = (revision) => request('/tsinghua-paratera/api/models', {
       method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify({ models: [sample], revision }),
     }).then((reply) => reply.json());
     const savedModels = await writeModels(modelState.revision);
     check(savedModels.ok, 'real Mac Settings write failed');
-    const persistedModels = await (await request('/paratera-balance/api/models', { headers })).json();
+    const persistedModels = await (await request('/tsinghua-paratera/api/models', { headers })).json();
     check(persistedModels.models?.some((model) => model.id === sample.id && model.reasoningEfforts?.max === 'max'), 'Mac model settings did not round-trip');
     const staleModels = await writeModels(modelState.revision);
     check(!staleModels.ok && staleModels.error === 'config-conflict', 'real Mac Settings did not reject a stale revision');
     for (const route of ['credentials/status', 'keys', 'keys/import/status', 'models', 'diagnostics', '2fa/status']) {
-      check((await request('/paratera-balance/api/' + route)).status === 401, `${route} must require authentication`);
+      check((await request('/tsinghua-paratera/api/' + route)).status === 401, `${route} must require authentication`);
     }
     const index = await request('/', { headers });
     const html = await index.text();
     check(index.status === 200, 'DSH index did not load');
-    const match = html.match(/"id":"dsh-paratera-balance","url":"([^"]+)"/);
+    const match = html.match(/"id":"dsh-tsinghua-paratera","url":"([^"]+)"/);
     check(Boolean(match), 'plugin client was not registered');
     const client = await request('/' + match[1], { headers });
     const code = await client.text();
-    check(client.status === 200 && code.includes('conversation.input.right') && code.includes('paratera-balance-settings'), 'plugin client code was not served');
+    check(client.status === 200 && code.includes('conversation.input.right') && code.includes('tsinghua-paratera-settings'), 'plugin client code was not served');
     for (const route of ['refresh', 'login', 'credentials']) {
-      const result = await request('/paratera-balance/api/' + route, { headers });
+      const result = await request('/tsinghua-paratera/api/' + route, { headers });
       check(result.status === 405, `${route} must reject GET without performing the action`);
     }
     check(!fs.existsSync(path.join(home, 'easycompute-session.json')), 'verification must not obtain an account session');

@@ -20,13 +20,13 @@
 - **短期 token**：位于 `DSH_HOME/easycompute-session.json` 和 `paratera-console-session.json`；是 bearer token，不是匿名数据。Unix 新写文件为 `0600`，专用目录为 `0700`。普通缓存文件没有额外应用层加密，请保护 OS 用户账户和磁盘。
 - **余额缓存**：`easycompute-state.json` 只保存必要数值、时间、固定错误码和操作布尔值；不保留院系、班级或用户 UUID。新版写入时会丢弃旧状态中的非白名单字段。
 - **API 密钥**：导入后交给 DSH 凭据服务。宿主可能使用本地凭据文件，不能把“只在宿主保存”理解成硬件加密。插件不直接回传完整值，显示的指纹是哈希摘要。
-- **Chrome profile**：与日常浏览器分开，仍包含登录 cookie、站点存储及浏览器历史。默认 Mac 路径是 `~/Library/Application Support/DSH Paratera Balance/Chrome`；Windows 为 `%LOCALAPPDATA%/dsh-paratera-profile`。自定义 home 使用 `DSH_HOME/browser-profile`。
+- **Chrome profile**：与日常浏览器分开，仍包含登录 cookie、站点存储及浏览器历史。默认 Mac 路径是 `~/Library/Application Support/DSH Tsinghua Paratera/Chrome`；Windows 为 `%LOCALAPPDATA%/dsh-tsinghua-paratera-profile`。自定义 home 使用 `DSH_HOME/browser-profile`。
 
 后台续期默认关闭，使用 `--task` 主动开启。信任浏览器默认不选中，用户可明确选择平台提供的长期信任。关闭插件/卸载并不自动注销平台会话。
 
 ## 清理与反馈
 
-先退出专用 Chrome，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 密码可在钥匙串访问中删除 `DSH 清华算力余额` 条目；Windows 可删除对应 DPAPI blob。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
+先退出专用 Chrome，再清理上述插件专属缓存/profile；不要删除整个 DSH_HOME。Mac 密码可在钥匙串访问中删除 `DSH 清华算力（Paratera）` 条目；Windows 可删除对应 DPAPI blob。导入的 API 密钥可能被多个模型使用，需要在 DSH 或平台中单独删除/撤销。
 
 不要在公开 issue、日志、截图或打包文件中提供密码、验证码、完整密钥、cookie、token、个人 profile 或未脱敏账户信息。
 

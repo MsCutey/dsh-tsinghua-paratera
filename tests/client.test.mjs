@@ -45,7 +45,7 @@ function fixture(provider = 'paratera') {
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
 test('uses native quota slot and session-specific model store', () => {
-  const f=fixture(); assert.equal(f.registration.spec.id,'paratera-balance'); assert.equal(f.registration.spec.order,16)
+  const f=fixture(); assert.equal(f.registration.spec.id,'tsinghua-paratera'); assert.equal(f.registration.spec.order,16)
   assert.ok(f.stores.has('session-a')); assert.equal(f.render().children[0],'余额…'); f.dispose()
 })
 test('fetches balance, exposes calculation caveat, and polls only while visible', async () => {

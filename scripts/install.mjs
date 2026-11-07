@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { buildCredentialHelper } from '../lib/macos-credentials.mjs';
 import { resolveInstallPlan } from '../lib/platform.mjs';
 
-export const PACKAGE_NAME = 'dsh-paratera-balance';
+export const PACKAGE_NAME = 'dsh-tsinghua-paratera';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = path.resolve(HERE, '..');
 
@@ -235,7 +235,7 @@ async function main() {
     ? ['restart DSH']
     : [
       'restart DSH',
-      'settings -> 清华算力余额 -> 保存凭据',
+      'settings -> 清华算力（Paratera） -> 保存凭据',
       summary.task?.ok === false ? 'background task failed; rerun with --task or see the error above' : null,
     ].filter(Boolean);
   console.log(JSON.stringify(summary, null, 2));

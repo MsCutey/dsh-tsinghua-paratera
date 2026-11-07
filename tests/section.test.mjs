@@ -55,9 +55,9 @@ function fixture(handler = () => undefined, options = {}) {
       requests.push(request)
       const result = await handler(request)
       if (result !== undefined) return result
-      if (url === '/paratera-balance/api/keys') return response({ ok: true, keys: [key()] })
-      if (url === '/paratera-balance/api/credentials/status') return response({ saved: false })
-      if (url === '/paratera-balance/api/keys/import/status') return response({ ok: true, running: false, stage: 'idle', startedAt: null, operationId: null, result: null })
+      if (url === '/tsinghua-paratera/api/keys') return response({ ok: true, keys: [key()] })
+      if (url === '/tsinghua-paratera/api/credentials/status') return response({ saved: false })
+      if (url === '/tsinghua-paratera/api/keys/import/status') return response({ ok: true, running: false, stage: 'idle', startedAt: null, operationId: null, result: null })
       return response({ ok: true })
     },
   })
@@ -66,7 +66,7 @@ function fixture(handler = () => undefined, options = {}) {
     inject: (_, fn) => fn(),
     register: (spec, value) => { if (spec.name === 'settings.section') sections.set(spec.id, value) },
   } })
-  component = options.component === 'models' ? plugin.components.ModelsPanel : sections.get('paratera-balance')
+  component = options.component === 'models' ? plugin.components.ModelsPanel : sections.get('tsinghua-paratera')
   const fixture = {
     plugin, requests, intervals, timers, sections,
     section(id) { return sections.get(id) },
@@ -106,8 +106,8 @@ function text(value) {
   return typeof value === 'object' ? text(value.children) : String(value)
 }
 async function loaded(handler) { const f = fixture(handler); await tick(); await f.click('load'); return f }
-const keyRequests = (f) => f.requests.filter((r) => r.url === '/paratera-balance/api/keys')
-const importRequests = (f) => f.requests.filter((r) => r.url === '/paratera-balance/api/keys/import')
+const keyRequests = (f) => f.requests.filter((r) => r.url === '/tsinghua-paratera/api/keys')
+const importRequests = (f) => f.requests.filter((r) => r.url === '/tsinghua-paratera/api/keys/import')
 function picker(f) { return f.find((node) => node.props.key === 'picker') }
 function select(f, index = 0) { const checkboxes = walk(f.render()).filter((node) => node.props.type === 'checkbox'); if (!checkboxes[index].props.checked) checkboxes[index].props.onChange() }
 function clearSelection(f) { for (const checkbox of walk(f.render()).filter((node) => node.props.type === 'checkbox' && node.props.checked)) checkbox.props.onChange() }
@@ -825,7 +825,7 @@ const modelRow = (overrides = {}) => ({
 
 function modelsFixture(handler, options = {}) {
   return fixture(handler ?? ((r) => {
-    if (r.url !== '/paratera-balance/api/models') return response({ ok: true })
+    if (r.url !== '/tsinghua-paratera/api/models') return response({ ok: true })
     if (r.options.method === 'POST') return response({ ok: true, revision: 9, models: r.body.models })
     return response({ ok: true, revision: 8, models: options.rows ?? [modelRow()] })
   }), { component: 'models' })
@@ -843,7 +843,7 @@ test('the settings section survives a missing or broken composer slot', () => {
     },
   }
   fixture().plugin.apply(ctx)
-  assert.deepEqual([...sections.keys()], ['paratera-balance'])
+  assert.deepEqual([...sections.keys()], ['tsinghua-paratera'])
 })
 
 test('the composer slot falls back to an empty store when modelDirectories is gone', () => {
@@ -884,7 +884,7 @@ test('diagnostics footer reports host, plugin and compatibility', async () => {
 
 test('the plugin page registers one section whose second tab mounts the models panel', async () => {
   const f = fixture()
-  assert.deepEqual([...f.sections.keys()], ['paratera-balance'])
+  assert.deepEqual([...f.sections.keys()], ['tsinghua-paratera'])
   assert.equal(f.byKey('tab-account').props['aria-selected'], true)
   assert.equal(f.byKey('tab-models').props['aria-selected'], false)
   assert.equal(walk(f.render()).some((n) => typeof n.tag === 'function'), false)
@@ -906,7 +906,7 @@ test('模型设置 loads the host list, edits fields and saves the exact model l
   f.find((n) => n.props['data-field'] === 'image').props.onChange()
   f.find((n) => n.props['data-field'] === 'name').props.onChange({ target: { value: 'Kimi K3' } })
   await f.click('save-models')
-  const posts = f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const posts = f.requests.filter((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.equal(posts.length, 1)
   assert.deepEqual(posts[0].body.models, [{ id: 'Kimi-K3', name: 'Kimi K3', contextWindow: 200000, maxTokens: 8192, input: ['text', 'image'] }])
   assert.equal(posts[0].body.revision, 8)
@@ -924,7 +924,7 @@ test('思考挡位 is one control: unchecked means follow the model, first tick 
   for (const level of ['low', 'high', 'max']) assert.equal(f.find((n) => n.props['data-field'] === 'level-' + level).props.checked, true)
   assert.match(f.text(), /自定义挡位/)
   await f.click('save-models')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const post = f.requests.find((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max' })
   f.dispose()
 })
@@ -934,7 +934,7 @@ test('first tick on a middle level keeps the trio and adds it', async () => {
   await tick()
   f.find((n) => n.props['data-field'] === 'level-medium').props.onChange()
   await f.click('save-models')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const post = f.requests.find((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, low: 'low', high: 'high', max: 'max', medium: 'medium' })
   f.dispose()
 })
@@ -946,7 +946,7 @@ test('clearing every thinking level returns to following the model', async () =>
   for (const level of ['low', 'high', 'max']) f.find((n) => n.props['data-field'] === 'level-' + level).props.onChange()
   assert.match(f.text(), /未勾选＝跟随模型原生/)
   await f.click('save-models')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const post = f.requests.find((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.equal(post.body.models[0].reasoningEfforts, undefined)
   f.dispose()
 })
@@ -959,7 +959,7 @@ test('模型设置 edits the offered levels one by one', async () => {
   f.find((n) => n.props['data-field'] === 'level-low').props.onChange()
   assert.equal(f.find((n) => n.props['data-field'] === 'level-low').props.checked, false)
   await f.click('save-models')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const post = f.requests.find((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.deepEqual(post.body.models[0].reasoningEfforts, { off: null, medium: 'medium', high: 'high', max: 'max' })
   f.dispose()
 })
@@ -968,7 +968,7 @@ test('一键最大值 applies each model recommendation and saves it immediately
   const f = modelsFixture()
   await tick()
   await f.click('max-all')
-  const post = f.requests.find((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const post = f.requests.find((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.deepEqual(post.body.models, [{
     id: 'Kimi-K3', name: 'Kimi-K3', contextWindow: 1024000, maxTokens: 943718, input: ['text'],
   }])
@@ -981,7 +981,7 @@ test('模型设置 rejects invalid edits before the POST and can reset or delete
   await tick()
   f.find((n) => n.props['data-field'] === 'contextWindow').props.onChange({ target: { value: '0' } })
   await f.click('save-models')
-  assert.equal(f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST').length, 0)
+  assert.equal(f.requests.filter((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST').length, 0)
   assert.match(f.text(), /模型设置无效/)
   f.click('reset')
   assert.equal(f.find((n) => n.props['data-field'] === 'contextWindow').props.value, 1024000)
@@ -989,13 +989,13 @@ test('模型设置 rejects invalid edits before the POST and can reset or delete
   f.click('del')
   assert.doesNotMatch(f.text(), /恢复推荐值/)
   await f.click('save-models')
-  const posts = f.requests.filter((r) => r.url === '/paratera-balance/api/models' && r.options.method === 'POST')
+  const posts = f.requests.filter((r) => r.url === '/tsinghua-paratera/api/models' && r.options.method === 'POST')
   assert.deepEqual(posts[0].body.models, [])
   f.dispose()
 })
 
 test('模型设置 shows a friendly error when the host has no Settings service', async () => {
-  const f = modelsFixture((r) => r.url === '/paratera-balance/api/models' ? response({ ok: false, error: 'settings-unavailable' }) : response({ ok: true }))
+  const f = modelsFixture((r) => r.url === '/tsinghua-paratera/api/models' ? response({ ok: false, error: 'settings-unavailable' }) : response({ ok: true }))
   await tick()
   assert.match(f.text(), /宿主模型设置服务暂不可用/)
   assert.equal(f.byKey('save-models').props.disabled, true)

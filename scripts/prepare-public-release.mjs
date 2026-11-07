@@ -57,7 +57,7 @@ if (options['--copyright-name']) {
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^Copyright \(c\) \d{4} .+$/m, `Copyright (c) 2026 ${options['--copyright-name']}`));
 }
 const date = new Date().toISOString();
-const gitEnv = { ...process.env, TZ: 'UTC', GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: 'DSH Balance Contributors', GIT_AUTHOR_EMAIL: 'contributors@dsh-balance.invalid', GIT_COMMITTER_NAME: 'DSH Balance Contributors', GIT_COMMITTER_EMAIL: 'contributors@dsh-balance.invalid' };
+const gitEnv = { ...process.env, TZ: 'UTC', GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: 'DSH Tsinghua Paratera Contributors', GIT_AUTHOR_EMAIL: 'contributors@dsh-tsinghua-paratera.invalid', GIT_COMMITTER_NAME: 'DSH Tsinghua Paratera Contributors', GIT_COMMITTER_EMAIL: 'contributors@dsh-tsinghua-paratera.invalid' };
 const run = (file, parameters, env = process.env) => {
   const result = spawnSync(file, parameters, { cwd: tree, env, encoding: 'utf8', timeout: 120000 });
   if (result.status !== 0) throw Error(`release command failed: ${path.basename(file)}`);

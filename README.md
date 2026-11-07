@@ -1,9 +1,12 @@
-# DSH Paratera Balance
+# DSH 清华算力 · Paratera
 
-DeepSeek Harness（DSH）的非官方清华算力插件，支持 **macOS / Windows**。
-在使用 Paratera 模型时显示算力券余额，并提供控制台密钥管理、模型导入和模型参数设置。
+DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
+登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
 当前版本：**1.0.0**。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+
+> **适用范围**：仅适用于通过 `id.tsinghua.edu.cn` 登录的清华算力平台账号（`easycompute.cs.tsinghua.edu.cn`）。
+> Paratera 官方账号或其他高校、企业的 Paratera 接入**不在支持范围**，登录步骤无法通过。
 
 ## 功能
 
@@ -34,7 +37,7 @@ DeepSeek Harness（DSH）的非官方清华算力插件，支持 **macOS / Windo
 从本仓库 GitHub Releases 下载源码 ZIP 或插件 TGZ，解压到长期保留的位置。
 
 ```sh
-cd /path/to/dsh-paratera-balance
+cd /path/to/dsh-tsinghua-paratera
 node scripts/install.mjs --dry-run
 node scripts/install.mjs
 node scripts/install.mjs --verify
@@ -54,7 +57,7 @@ Windows 使用安装目录中 `resources\runtime\primary-runtime\dependencies\no
 
 ## 登录与余额
 
-打开「设置 → 清华算力余额 → 账号登录」。
+打开「设置 → 清华算力（Paratera） → 账号登录」。
 
 1. 选择「重新登录」，在专用 Chrome 窗口中完成登录，再回到 DSH 刷新。
 2. 如果需要自动登录，可选择「保存凭据」，在系统原生窗口输入密码；保存并关闭窗口后会尝试登录。
@@ -92,7 +95,7 @@ node scripts/install.mjs --uninstall
 
 Mac 默认先停止对应后台任务再移除插件；Windows 的后台任务可在任务计划程序中删除。卸载保留登录凭据、会话和浏览器 profile，以免误删共享密钥。
 
-如需清理：退出专用 Chrome 后，仅清理该插件的会话文件与专用 profile；Mac 密码在「钥匙串访问」中按 `DSH 清华算力余额` 查找，Windows 密码为 DSH_HOME 内的 `easycompute-credentials.bin`。导入到 DSH 的 API 密钥由宿主管理，必要时先在平台撤销对应密钥。详见 [隐私说明](PRIVACY.md)。
+如需清理：退出专用 Chrome 后，仅清理该插件的会话文件与专用 profile；Mac 密码在「钥匙串访问」中按 `DSH 清华算力（Paratera）` 查找，Windows 密码为 DSH_HOME 内的 `easycompute-credentials.bin`。导入到 DSH 的 API 密钥由宿主管理，必要时先在平台撤销对应密钥。详见 [隐私说明](PRIVACY.md)。
 
 ## 隐私与安全
 

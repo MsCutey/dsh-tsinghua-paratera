@@ -20,7 +20,7 @@ test('Mac uses system/user Chrome apps and an isolated Application Support profi
   assert.ok(posix(value.sessionFile).endsWith('/easycompute-session.json'));
   assert.ok(posix(value.dshHome).endsWith('/test dsh'));
   assert.equal(value.profileDir, path.join(value.dshHome, 'browser-profile'));
-  assert.equal(posix(platformPaths('darwin', '/Users/Example', {}).profileDir), '/Users/Example/Library/Application Support/DSH Paratera Balance/Chrome');
+  assert.equal(posix(platformPaths('darwin', '/Users/Example', {}).profileDir), '/Users/Example/Library/Application Support/DSH Tsinghua Paratera/Chrome');
   assert.ok(value.chromeCandidates.map(posix).includes('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(value.chromeCandidates.map(posix).includes('/Users/测试 User/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'));
   assert.ok(!value.chromeCandidates.some((file) => file.endsWith('.exe')));
@@ -28,7 +28,7 @@ test('Mac uses system/user Chrome apps and an isolated Application Support profi
 
 test('Windows retains Chrome and LOCALAPPDATA profile locations', () => {
   const value = platformPaths('win32', '/home/test', { LOCALAPPDATA: '/custom-local' });
-  assert.equal(posix(value.profileDir), '/custom-local/dsh-paratera-profile');
+  assert.equal(posix(value.profileDir), '/custom-local/dsh-tsinghua-paratera-profile');
   assert.ok(value.chromeCandidates.map(posix).includes('/custom-local/Google/Chrome/Application/chrome.exe'));
 });
 

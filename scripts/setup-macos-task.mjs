@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-export const LABEL = 'cn.edu.tsinghua.dsh-paratera-balance.refresh';
+export const LABEL = 'cn.edu.tsinghua.dsh-tsinghua-paratera.refresh';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const xml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { recommendedModel, recommendedMaxTokens, thinkingEfforts, supportsReasoning, isVisionModel, normalizeModel, validateModels, readModels, writeModels } from '../lib/models.mjs';
 import { createPlugin } from '../lib/index.js';
 
-const ROUTE = '/paratera-balance/api/models';
+const ROUTE = '/tsinghua-paratera/api/models';
 afterEach(() => mock.restoreAll());
 
 const stored = () => ({
@@ -175,19 +175,19 @@ test('models route reads and writes through the injected Settings service', asyn
 
 test('diagnostics route reports versions, services and the client heartbeat', async () => {
   const f = fixture(async () => ({ ok: true }), { settings: settingsFixture() });
-  const diag = await f.request(null, { method: 'GET', route: '/paratera-balance/api/diagnostics' });
+  const diag = await f.request(null, { method: 'GET', route: '/tsinghua-paratera/api/diagnostics' });
   assert.equal(diag.status, 200);
   assert.equal(diag.body.ok, true);
   assert.equal(typeof diag.body.plugin.version, 'string');
   assert.equal(diag.body.services.settings, true);
   assert.equal(diag.body.services.llm, true);
   assert.equal(diag.body.client.lastSeenAt, null);
-  const wrong = await f.request({}, { method: 'POST', route: '/paratera-balance/api/diagnostics' });
+  const wrong = await f.request({}, { method: 'POST', route: '/tsinghua-paratera/api/diagnostics' });
   assert.equal(wrong.status, 405);
-  const hello = await f.request({}, { method: 'POST', route: '/paratera-balance/api/diagnostics/hello' });
+  const hello = await f.request({}, { method: 'POST', route: '/tsinghua-paratera/api/diagnostics/hello' });
   assert.equal(hello.status, 200);
   assert.equal(hello.body.ok, true);
-  const again = await f.request(null, { method: 'GET', route: '/paratera-balance/api/diagnostics' });
+  const again = await f.request(null, { method: 'GET', route: '/tsinghua-paratera/api/diagnostics' });
   assert.ok(again.body.client.ageMs >= 0);
   f.dispose();
 });

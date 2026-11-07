@@ -1,5 +1,5 @@
 {
-  "name": "dsh-paratera-balance",
+  "name": "dsh-tsinghua-paratera",
   "version": "1.0.0",
   "scripts": {
     "test": "node --test --test-force-exit tests/*.test.mjs",
@@ -17,7 +17,7 @@
     "release:prepare": "node scripts/prepare-public-release.mjs"
   },
   "private": true,
-  "description": "DSH 原生模型栏余额插件：读取清华算力平台算力券余额，专用浏览器会话自动续期，设置页可刷新与重新登录",
+  "description": "DSH 非官方清华算力（Paratera）插件：统一身份认证登录与续期、算力券余额、控制台 API 密钥管理、模型导入与参数设置",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -65,6 +65,7 @@
     "deepseek-harness",
     "dsh-plugin",
     "easycompute",
+    "paratera",
     "tsinghua"
   ],
   "devDependencies": {

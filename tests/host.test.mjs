@@ -23,13 +23,13 @@ function host(config = {}) {
   return {
     routes,
     async request(path, method = 'GET') {
-      const handler = routes.get('/paratera-balance/api/' + path)
+      const handler = routes.get('/tsinghua-paratera/api/' + path)
       if (!handler) return { status: 404 }
       let status = 0
       let headers = {}
       let body = ''
       const res = { writeHead(code, h) { status = code; headers = h }, end(text) { body = text } }
-      await handler({ method, url: '/paratera-balance/api/' + path }, res)
+      await handler({ method, url: '/tsinghua-paratera/api/' + path }, res)
       return { status, headers, body: body ? JSON.parse(body) : null }
     },
   }
@@ -117,7 +117,8 @@ test('an invalid payload never fabricates a zero balance', async () => {
   assert.notEqual(result.body.balance, 0)
 })
 
-test('an open login browser produces actionable instructions instead of chrome-not-ready', async () => {
+// Requires a resolvable Chrome binary, which only exists on the supported platforms.
+test('an open login browser produces actionable instructions instead of chrome-not-ready', { skip: !['darwin', 'win32'].includes(process.platform) }, async () => {
   mock.method(fs, 'mkdirSync', () => {})
   mock.method(fs, 'openSync', () => 99999)
   mock.method(fs, 'writeFileSync', () => {})
@@ -136,28 +137,28 @@ test('an open login browser produces actionable instructions instead of chrome-n
 test('only the documented routes exist', async () => {
   const h = host()
   assert.deepEqual([...h.routes.keys()].sort(), [
-    '/paratera-balance/api/2fa/cancel',
-    '/paratera-balance/api/2fa/choose',
-    '/paratera-balance/api/2fa/code',
-    '/paratera-balance/api/2fa/status',
-    '/paratera-balance/api/balance',
-    '/paratera-balance/api/console/connect',
-    '/paratera-balance/api/console/status',
-    '/paratera-balance/api/credentials',
-    '/paratera-balance/api/credentials/status',
-    '/paratera-balance/api/diagnostics',
-    '/paratera-balance/api/diagnostics/hello',
-    '/paratera-balance/api/keys',
-    '/paratera-balance/api/keys/create',
-    '/paratera-balance/api/keys/delete',
-    '/paratera-balance/api/keys/import',
-    '/paratera-balance/api/keys/import/status',
-    '/paratera-balance/api/keys/refresh-models',
-    '/paratera-balance/api/keys/update',
-    '/paratera-balance/api/login',
-    '/paratera-balance/api/models',
-    '/paratera-balance/api/refresh',
-    '/paratera-balance/api/status',
+    '/tsinghua-paratera/api/2fa/cancel',
+    '/tsinghua-paratera/api/2fa/choose',
+    '/tsinghua-paratera/api/2fa/code',
+    '/tsinghua-paratera/api/2fa/status',
+    '/tsinghua-paratera/api/balance',
+    '/tsinghua-paratera/api/console/connect',
+    '/tsinghua-paratera/api/console/status',
+    '/tsinghua-paratera/api/credentials',
+    '/tsinghua-paratera/api/credentials/status',
+    '/tsinghua-paratera/api/diagnostics',
+    '/tsinghua-paratera/api/diagnostics/hello',
+    '/tsinghua-paratera/api/keys',
+    '/tsinghua-paratera/api/keys/create',
+    '/tsinghua-paratera/api/keys/delete',
+    '/tsinghua-paratera/api/keys/import',
+    '/tsinghua-paratera/api/keys/import/status',
+    '/tsinghua-paratera/api/keys/refresh-models',
+    '/tsinghua-paratera/api/keys/update',
+    '/tsinghua-paratera/api/login',
+    '/tsinghua-paratera/api/models',
+    '/tsinghua-paratera/api/refresh',
+    '/tsinghua-paratera/api/status',
   ])
   for (const legacy of ['probe', 'token-info', 'widget.js', 'report', 'report-log']) {
     assert.equal((await h.request(legacy)).status, 404)

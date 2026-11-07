@@ -8,7 +8,7 @@ let configuredHome = ProcessInfo.processInfo.environment["DSH_HOME"].flatMap { $
 let namespace = configuredHome == defaultHome ? "" : "." + SHA256.hash(data: Data(configuredHome.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
 let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
-    kSecAttrService as String: "cn.edu.tsinghua.dsh-paratera-balance" + namespace,
+    kSecAttrService as String: "cn.edu.tsinghua.dsh-tsinghua-paratera" + namespace,
     kSecAttrAccount as String: "easycompute",
 ]
 
@@ -69,7 +69,7 @@ func storeCredentials() {
     if status == errSecItemNotFound {
         var item = query
         item[kSecValueData as String] = data
-        item[kSecAttrLabel as String] = "DSH 清华算力余额"
+        item[kSecAttrLabel as String] = "DSH 清华算力（Paratera）"
         status = SecItemAdd(item as CFDictionary, nil)
     }
     let notice = NSAlert()

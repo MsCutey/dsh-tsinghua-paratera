@@ -71,8 +71,8 @@ test('installed browser React renders the composer balance using real slot and m
     // Do not call chip.inject from the unguarded root context: that would prime
     // the model-directory cache and hide the undeclared remote.session access.
     rendered = root.get('uiRenderer').mount(page.window.document.getElementById('test'));
-    for (let attempt = 0; attempt < 20 && !page.window.document.querySelector('.paratera-balance')?.textContent.includes('123.45'); attempt++) await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.equal(page.window.document.querySelector('.paratera-balance')?.textContent, '¥123.45');
+    for (let attempt = 0; attempt < 20 && !page.window.document.querySelector('.tsinghua-paratera')?.textContent.includes('123.45'); attempt++) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(page.window.document.querySelector('.tsinghua-paratera')?.textContent, '¥123.45');
     assert.equal(warnings.length, 0);
   } finally {
     if (rendered) modules['react-dom'].flushSync(() => rendered());

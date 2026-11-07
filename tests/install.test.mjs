@@ -4,12 +4,12 @@ import path from 'node:path'
 import { planManifest, PACKAGE_NAME, runBackgroundTask } from '../scripts/install.mjs'
 import { resolveInstallPlan } from '../lib/platform.mjs'
 
-const PLUGIN = 'F:\\Vibe Coding\\插件开发\\dsh-paratera-balance'
+const PLUGIN = 'F:\\Vibe Coding\\插件开发\\dsh-tsinghua-paratera'
 
 test('adds the link dependency and bundle entry', () => {
   const plan = planManifest({ name: 'p', private: true, dependencies: { other: '1.0.0' }, dsh: { profile: { bundles: ['some-plugin'] } } }, PLUGIN)
   assert.equal(plan.changed, true)
-  assert.equal(plan.manifest.dependencies[PACKAGE_NAME], 'link:F:/Vibe Coding/插件开发/dsh-paratera-balance')
+  assert.equal(plan.manifest.dependencies[PACKAGE_NAME], 'link:F:/Vibe Coding/插件开发/dsh-tsinghua-paratera')
   assert.deepEqual(plan.manifest.dsh.profile.bundles, ['some-plugin', PACKAGE_NAME])
   assert.equal(plan.manifest.dependencies.other, '1.0.0')
 })

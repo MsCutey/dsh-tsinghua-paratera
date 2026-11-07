@@ -24,7 +24,7 @@ test('temporary Mac profile installs, verifies, reinstalls, and uninstalls throu
   try {
     const dryRun = run('--dry-run');
     assert.equal(dryRun.wouldWrite, true);
-    assert.equal(JSON.parse(fs.readFileSync(manifestPath)).dependencies['dsh-paratera-balance'], undefined);
+    assert.equal(JSON.parse(fs.readFileSync(manifestPath)).dependencies['dsh-tsinghua-paratera'], undefined);
     const installed = run();
     assert.equal(installed.ok, true);
     assert.equal(installed.state.moduleLinked, true);
@@ -35,6 +35,6 @@ test('temporary Mac profile installs, verifies, reinstalls, and uninstalls throu
     const restored = JSON.parse(fs.readFileSync(manifestPath));
     assert.deepEqual(restored.dsh.profile.bundles, ['existing-bundle']);
     assert.deepEqual(restored.preserved, { test: true });
-    assert.equal(fs.existsSync(path.join(profile, 'node_modules', 'dsh-paratera-balance')), false);
+    assert.equal(fs.existsSync(path.join(profile, 'node_modules', 'dsh-tsinghua-paratera')), false);
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
