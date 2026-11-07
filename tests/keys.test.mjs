@@ -85,3 +85,17 @@ test('key mutations use expected endpoint, body and UUID with mock transport onl
     ['/lms/api/key/open', 'POST', { keyModels: 'all' }],
   ]);
 });
+
+test('opaque base64 token ids from the console are accepted', async () => {
+  const uuid = 'AbC+dEf/GhI=';
+  const result = await listKeys({ request: async () => ({ ok: true, data: { rows: [row(uuid, 'work-key')], total: 1 } }) });
+  assert.equal(result.ok, true);
+  assert.equal(result.keys[0].uuid, uuid);
+});
+
+test('token ids with unsafe characters are still rejected', async () => {
+  for (const uuid of ['a b', 'a<b', 'a\nb', 'a"b', 'sk-live-plaintext', 'x'.repeat(513)]) {
+    const result = await listKeys({ request: async () => ({ ok: true, data: { rows: [row(uuid, 'name')] } }) });
+    assert.deepEqual(result, { ok: false, error: 'keys-invalid-response' }, uuid);
+  }
+});
