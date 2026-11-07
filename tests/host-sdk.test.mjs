@@ -9,12 +9,40 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { importKey } from '../lib/import.mjs';
+import vm from 'node:vm';
 
 const sdkRoot = process.env.DSH_SDK_NODE_MODULES;
 const SECRET = 'sk-test-only-installed-host-0123456789';
 const PREVIOUS = 'sk-test-only-installed-host-previous-9876543210';
 const MODEL = 'test-org/test-import-model';
 const SECOND_MODEL = 'test-org/test-import-second-model';
+
+test('installed client context binds a late model directory before mounting the balance chip', { skip: !sdkRoot }, async () => {
+  const { Context } = await import(pathToFileURL(path.join(sdkRoot, '@deepseek-ai/cordis/lib/index.js')).href);
+  const root = new Context();
+  let entry;
+  const registrations = new Map();
+  const store = { subscribe: () => () => {}, getSnapshot: () => ({ current: { provider: 'paratera', model: MODEL } }) };
+  root.reflect.provide('slots', {
+    inject: (_, callback) => callback(),
+    register(spec, component) { registrations.set(spec.name, { spec, component }); return () => registrations.delete(spec.name) },
+  });
+  vm.runInNewContext(fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), {
+    window: { __ModuleLoader__: { load: (value) => { entry = value } } },
+    fetch: async () => ({ ok: true }),
+  });
+  const fork = root.plugin(entry.factory(() => ({ createElement: () => {} })));
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(registrations.has('settings.section'));
+    assert.equal(registrations.has('conversation.input.right'), false);
+    root.reflect.provide('modelDirectories', { directoryFor: (id) => { assert.equal(id, 'late-sdk-session'); return { store } } });
+    await new Promise((resolve) => setImmediate(resolve));
+    const chip = registrations.get('conversation.input.right');
+    assert.ok(chip, 'chip must become available when the real context activates the child injection');
+    assert.equal(chip.spec.inject('late-sdk-session').directory, store);
+  } finally { await fork.dispose(); }
+});
 
 function assertSafeTemp(folder) {
   assert.equal(path.dirname(folder), os.tmpdir());

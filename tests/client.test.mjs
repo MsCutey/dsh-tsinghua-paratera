@@ -70,3 +70,28 @@ test('unmount aborts in-flight request and removes all lifecycle resources', () 
   const f=fixture(); f.render(); f.runEffect(); f.dispose()
   assert.equal(f.requests[0].opts.signal.aborted,true); assert.equal(f.intervals.size,0)
 })
+
+test('late model-directory availability registers the chip without blocking settings', () => {
+  let entry, ready, chip, settings
+  const snapshot = { current: { provider: 'paratera', model: 'late-model' } }
+  const store = { subscribe: () => () => {}, getSnapshot: () => snapshot }
+  vm.runInNewContext(source, { window: { __ModuleLoader__: { load: (value) => { entry = value } } }, fetch: async () => ({ ok: true }) })
+  const plugin = entry.factory(() => ({ createElement: () => {} }))
+  const ctx = {
+    get: () => undefined,
+    inject(names, callback) { assert.deepEqual(Array.from(names), ['modelDirectories']); ready = callback },
+    slots: {
+      inject: (_, callback) => callback(),
+      register(spec, component) {
+        if (spec.name === 'settings.section') settings = { spec, component }
+        if (spec.name === 'conversation.input.right') chip = { spec, component }
+      },
+    },
+  }
+  plugin.apply(ctx)
+  assert.ok(settings)
+  assert.equal(chip, undefined, 'do not bind the chip to a permanent empty store')
+  ready({ ...ctx, get: () => ({ directoryFor: (id) => { assert.equal(id, 'session-late'); return { store } } }) })
+  assert.equal(chip.spec.inject('session-late').directory, store)
+  assert.equal(chip.spec.inject('session-late').directory.getSnapshot().current.provider, 'paratera')
+})
