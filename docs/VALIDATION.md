@@ -28,6 +28,7 @@
 | 凭据窗口竞态 | 通过 | 窗口打开时拒绝删除；启动期不会留下错误 open 状态 |
 | 凭据删除路由 | 通过 | 只接受 `DELETE` + `{confirm:true}`；未授权先于解析；响应不含密码/token/原始异常 |
 | 隔离 profile 安装/卸载 | 通过（自动化） | 临时中文/空格路径，真实 pnpm；安装、verify、幂等重装、卸载、重复卸载、`--purge-profile` |
+| 交付 TGZ 安装/卸载 | 通过 | 从 93 KB 插件包解压、真实 pnpm 链接、`--verify` 通过、卸载恢复原 manifest；使用临时 home 的 Keychain 命名空间 |
 | 共享 profile | 通过 | 同 home 第二个 profile 存在时保留共享数据并拒绝 purge |
 | YAML 清理 | 通过 | CRLF、引号、嵌套 provider、默认模型；复杂 YAML 原样拒绝 |
 | 活跃刷新锁 | 通过 | 拒绝清理且不终止锁持有进程 |
