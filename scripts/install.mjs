@@ -82,7 +82,7 @@ export function planManifest(manifest, pluginDir, { uninstall = false } = {}) {
 
 /** Data the plugin created outside the profile manifest (models, sessions, profile). */
 export function pluginDataPaths(dshHome, platform = process.platform, home = os.homedir(), env = process.env) {
-  const join = platform === 'win32' ? path.win32.join : path.join;
+  const join = platform === 'win32' ? path.win32.join : path.posix.join;
   return {
     sessionFiles: [
       join(dshHome, 'easycompute-session.json'),
