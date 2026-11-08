@@ -496,7 +496,8 @@ for (const status of ['invalid', 'disabled']) {
     f.click('import')
     assert.equal(picker(f), undefined)
     assert.equal(importRequests(f).length, 0)
-    assert.match(f.text(), /该密钥已禁用，请先启用再导入/)
+    assert.match(f.text(), /该密钥已禁用，请到 Paratera 官网控制台启用后再导入/)
+    assert.equal(f.find((node) => node.props.key === 'toggle'), undefined)
     f.dispose()
   })
 }

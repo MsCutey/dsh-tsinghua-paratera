@@ -1,7 +1,7 @@
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { listKeys, createKey, renameKey, setKeyStatus, deleteKey, refreshSupportedModels } from '../lib/keys.mjs';
+import { listKeys, createKey, renameKey, deleteKey, refreshSupportedModels } from '../lib/keys.mjs';
 import { CONSOLE_SESSION_FILE } from '../lib/console.mjs';
 
 afterEach(() => mock.restoreAll());
@@ -59,7 +59,7 @@ test('pagination stalls, bound exhaustion, and intermediate request failures nev
 
 test('key mutation validation prevents requests before any session read', async () => {
   mock.method(fs, 'readFileSync', () => assert.fail('invalid mutation must not read session'));
-  for (const operation of [() => createKey(' '), () => createKey(null), () => renameKey('', 'new'), () => renameKey({}, 'new'), () => renameKey('id', ''), () => setKeyStatus('id', 'deleted'), () => setKeyStatus({}, 'valid'), () => deleteKey(''), () => deleteKey({})]) {
+  for (const operation of [() => createKey(' '), () => createKey(null), () => renameKey('', 'new'), () => renameKey({}, 'new'), () => renameKey('id', ''), () => deleteKey(''), () => deleteKey({})]) {
     assert.equal((await operation()).ok, false);
   }
 });
@@ -74,13 +74,12 @@ test('key mutations use expected endpoint, body and UUID with mock transport onl
     requests.push([new URL(url).pathname, options.method, JSON.parse(options.body)]);
     return new Response(JSON.stringify({ code: 200, data: url.endsWith('/llmSk') ? { rows: [], total: 0 } : null }));
   });
-  for (const operation of [() => createKey(' test '), () => renameKey('uuid', ' renamed '), () => setKeyStatus('uuid', 'invalid'), () => deleteKey('uuid'), () => refreshSupportedModels()]) {
+  for (const operation of [() => createKey(' test '), () => renameKey('uuid', ' renamed '), () => deleteKey('uuid'), () => refreshSupportedModels()]) {
     assert.deepEqual(await operation(), { ok: true });
   }
   assert.deepEqual(requests, [
     ['/lms/api/key/create', 'POST', { tokenName: 'test', billingType: 'PostPaid' }],
     ['/lms/api/key/update', 'POST', { tokenUuid: 'uuid', tokenName: 'renamed' }],
-    ['/lms/api/key/update', 'POST', { tokenUuid: 'uuid', tokenStatus: 'invalid' }],
     ['/lms/api/key/delete', 'DELETE', { tokenUuid: 'uuid' }],
     ['/lms/api/key/llmSk', 'POST', { pageNum: 1, pageSize: 100 }],
     ['/lms/api/key/open', 'POST', { keyModels: 'all' }],

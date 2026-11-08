@@ -1,6 +1,6 @@
 # macOS 使用与验收指南
 
-适用版本：`1.0.5-macos.1`。该版本对应 Windows 修复版 `1.0.5-windows.2`，并补齐 macOS 的密码删除、卸载清理与安装器路径。
+适用版本：`1.0.5-macos.2`。该版本对应 Windows 修复版 `1.0.5-windows.2`，并补齐 macOS 的密码删除、卸载清理与安装器路径。
 
 ## 适用范围
 
@@ -62,6 +62,8 @@ node scripts/install.mjs --verify
 - `DELETE /lms/api/key/delete`，`{ tokenUuid }`
 
 删除只发一次请求，随后通过 `POST /lms/api/key/llmSk` 完整分页只读核验。列表不完整、目标仍存在或结果未知时不会显示成功，也不会自动重试。新建超时/断网时保留草稿并提示先按名称核实。
+
+插件不再提供「禁用 / 启用」密钥操作。该操作曾调用平台 `api/key/update`，但平台返回成功后状态未变，容易误报；现在请在 `ai.paratera.com` 官网控制台启停密钥。已禁用密钥在插件中仍会显示，导入时会提示先到官网启用。
 
 详细根因、固定向量和实机验收边界见 [密钥管理记录](KEY-MANAGEMENT.md)。
 

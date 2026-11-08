@@ -3,7 +3,7 @@
 DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
 登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
-当前版本：**1.0.5-macos.1**，对应 Windows 修复版 `1.0.5-windows.2` 的功能线，并补齐 macOS 的密钥删除、密码清理与安装器行为。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+当前版本：**1.0.5-macos.2**，对应 Windows 修复版 `1.0.5-windows.2` 的功能线，并补齐 macOS 的密钥删除、密码清理与安装器行为。本项目不隶属于清华大学、Paratera 或 DeepSeek。
 
 macOS 安装、钥匙串、卸载与验收边界见 [macOS 指南](docs/MACOS.md)；密钥认证根因与验证见 [密钥管理记录](docs/KEY-MANAGEMENT.md)。
 
@@ -16,7 +16,7 @@ macOS 安装、钥匙串、卸载与验收边界见 [macOS 指南](docs/MACOS.md
 - 专用 Chrome 会话登录与续期，不使用日常 Chrome profile。
 - 可选保存登录密码：macOS Keychain / Windows 当前用户 DPAPI；两个平台都可在设置页二次确认后删除本机保存的密码。
 - 短信、企业微信二次认证；验证码由用户输入。信任浏览器默认关闭，需主动选择。
-- 控制台 API 密钥列表、新建、改名、启停、删除及所选密钥导入。
+- 控制台 API 密钥列表、新建、改名、删除及所选密钥导入；密钥启停请使用 Paratera 官网控制台。
 - 新建/删除密钥后核验真实结果：超时、网络中断或 HTTP 200 缺少业务成功码时不假报成功，也不自动重复破坏性请求。
 - 模型导入、上下文/最大输出、输入类型、思考挡位设置；通过 DSH Settings 即时更新。
 - 宿主兼容性诊断；后台续期为可选功能，安装时默认不注册。
