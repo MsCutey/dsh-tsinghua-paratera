@@ -2,7 +2,7 @@
 
 ## 版本与范围
 
-- 修复版：`1.0.5-windows.2`，基于上游 `1.0.4` / commit `90a6540a901f7a139727990833f12114cce7c14e`。
+- 修复版：`1.0.5-windows.3`，基于上游 `1.0.4` / commit `90a6540a901f7a139727990833f12114cce7c14e`。
 - 保留余额、登录、二次认证、密钥管理、模型导入和模型设置功能；没有改动 DSH 安装包，也没有自动安装到开发者正在使用的 profile。
 - Windows 10/11、Node.js 22+、Google Chrome；已安装且初始化过 DSH desktop profile。
 - 这是可测试的源码/插件修复包，不是 DSH 的 Windows EXE 安装器，也未代替上游公开发布。
@@ -41,7 +41,7 @@ $env:DSH_PNPM = 'D:\your-runtime\pnpm\bin\pnpm.mjs'
 
 ### 不能由客户端保证的边界
 
-2026-11-07 的完整调用链核对发现：原插件认证头误用 SHA-256，而官网使用 SparkMD5/MD5。`1.0.5-windows.2` 已修正为 `Bearer MD5(token)`，用户授权后真实新建→删除验收通过。DELETE 方法及 `{tokenUuid}` JSON 参数保持不变。根因证据、真实验收与复验入口见 [密钥管理修复记录](KEY-MANAGEMENT.md)。公开来源：
+2026-11-07 的完整调用链核对发现：原插件认证头误用 SHA-256，而官网使用 SparkMD5/MD5。`1.0.5-windows.3` 已修正为 `Bearer MD5(token)`，用户授权后真实新建→删除验收通过。DELETE 方法及 `{tokenUuid}` JSON 参数保持不变。根因证据、真实验收与复验入口见 [密钥管理修复记录](KEY-MANAGEMENT.md)。公开来源：
 
 - [平台入口](https://ai.paratera.com/)
 - [API 密钥页面脚本](https://ai.paratera.com/assets/js/index-CLU5W59i.js)

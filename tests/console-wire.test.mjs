@@ -40,7 +40,8 @@ async function peer(t) {
         assert.equal(req.method, 'POST');
         assert.deepEqual(body, { tokenName: NAME, billingType: 'PostPaid' });
         rows.set(CREATED, { tokenUuid: CREATED, tokenName: body.tokenName, tokenStatus: 'valid', modelScale: [], secretKey: FAKE_SECRET });
-        res.end(JSON.stringify({ code: 200, data: { tokenUuid: CREATED, secretKey: FAKE_SECRET } }));
+        // The public UI renders response.data verbatim as the one-time secret.
+        res.end(JSON.stringify({ code: 200, data: FAKE_SECRET }));
       } else if (req.url === '/lms/api/key/delete') {
         assert.equal(req.method, 'DELETE');
         assert.deepEqual(body, { tokenUuid: CREATED });
@@ -64,17 +65,37 @@ async function peer(t) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
-  const local = `http://127.0.0.1:${server.address().port}`;
-  const request = (pathname, options = {}, oldProof = false) => consoleFetch(pathname, {
-    ...options, read: () => ({ token: TOKEN }),
-    fetchImpl: async (url, config) => {
-      assert.equal(new URL(url).origin, CONSOLE_ORIGIN);
-      return fetch(local + new URL(url).pathname + new URL(url).search, {
-        ...config,
-        headers: { ...config.headers, connection: 'close', ...(oldProof ? { 'Ai-Authorization': OLD_SHA256_PROOF } : {}) },
+  const local = new URL(`http://127.0.0.1:${server.address().port}`);
+  // Plain node:http avoids undici's global keep-alive pool, which otherwise
+  // races --test-force-exit teardown on Windows.
+  const rawFetch = (url, config) => new Promise((resolve, reject) => {
+    const target = new URL(new URL(url).pathname + new URL(url).search, local);
+    const payload = config.body === undefined ? null : Buffer.from(String(config.body));
+    const headers = {
+      ...config.headers, connection: 'close',
+      ...(payload ? { 'content-length': String(payload.length) } : {}),
+      ...(oldProofFor(config) ? { 'Ai-Authorization': OLD_SHA256_PROOF } : {}),
+    };
+    const req = http.request({
+      hostname: target.hostname, port: target.port, path: target.pathname + target.search,
+      method: config.method || 'GET', headers,
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, text: async () => text });
       });
-    },
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
   });
+  let oldProofFor = () => false;
+  const request = (pathname, options = {}, oldProof = false) => {
+    oldProofFor = () => oldProof;
+    return consoleFetch(pathname, { ...options, read: () => ({ token: TOKEN }), fetchImpl: rawFetch });
+  };
   return { rows, calls, request };
 }
 
@@ -83,8 +104,8 @@ test('real HTTP new/list/delete lifecycle uses the official MD5 proof and preser
   const before = await listKeys({ request: p.request, pageSize: 1 });
   assert.deepEqual(before.keys.map((key) => key.uuid), [EXISTING]);
   const created = await createKey('  ' + NAME + '  ', { request: p.request });
-  assert.deepEqual(created, { ok: true });
-  assert.equal(JSON.stringify(created).includes(FAKE_SECRET), false);
+  // The host keeps the one-time plaintext; only its caller sees it.
+  assert.deepEqual(created, { ok: true, secret: FAKE_SECRET });
   const listed = await listKeys({ request: p.request, pageSize: 1 });
   assert.deepEqual(listed.keys.map((key) => key.uuid), [EXISTING, CREATED]);
   assert.equal(JSON.stringify(listed).includes(FAKE_SECRET), false);
@@ -104,7 +125,7 @@ test('the old SHA-256 header fails both mutations on the same real HTTP peer; co
   const old = (pathname, options) => p.request(pathname, options, true);
   assert.deepEqual(await createKey(NAME, { request: old }), { ok: false, error: 'console-session-expired' });
   assert.equal(p.rows.has(CREATED), false);
-  assert.deepEqual(await createKey(NAME, { request: p.request }), { ok: true });
+  assert.deepEqual(await createKey(NAME, { request: p.request }), { ok: true, secret: FAKE_SECRET });
   assert.equal(p.rows.has(CREATED), true);
   let verificationReads = 0;
   assert.deepEqual(await deleteKey(CREATED, { request: old, list: () => { verificationReads++; assert.fail('authentication rejection must not verify/retry'); } }), { ok: false, error: 'console-session-expired' });

@@ -56,6 +56,7 @@ function fixture(handler = () => undefined, options = {}) {
       const result = await handler(request)
       if (result !== undefined) return result
       if (url === '/tsinghua-paratera/api/keys') return response({ ok: true, keys: [key()] })
+      if (url === '/tsinghua-paratera/api/keys/defaults') return response({ ok: true, name: 'DESKTOP-TEST' })
       if (url === '/tsinghua-paratera/api/credentials/status') return response({ saved: false })
       if (url === '/tsinghua-paratera/api/keys/import/status') return response({ ok: true, running: false, stage: 'idle', startedAt: null, operationId: null, result: null })
       return response({ ok: true })
@@ -401,18 +402,18 @@ for (const [mode, failure] of [
 
 test('a browser-side create deadline preserves the draft and requests name verification without resubmitting', async () => {
   const pending = deferred()
-  const f = await loaded((r) => r.url.endsWith('/keys/create') ? pending.promise : undefined)
+  const f = await loaded((r) => r.url.endsWith('/keys/create-import') ? pending.promise : undefined)
   f.click('create')
   f.name('fake-create-timeout-draft')
   const task = f.submit()
-  const sent = f.requests.find((r) => r.url.endsWith('/keys/create'))
-  assert.deepEqual(sent.body, { name: 'fake-create-timeout-draft' })
+  const sent = f.requests.find((r) => r.url.endsWith('/keys/create-import'))
+  assert.deepEqual(sent.body, { name: 'fake-create-timeout-draft', autoModels: true })
   f.fireTimer(30000)
   assert.equal(sent.options.signal.aborted, true)
   pending.resolve(response({ ok: true }))
   await task
   await tick()
-  assert.equal(f.requests.filter((r) => r.url.endsWith('/keys/create')).length, 1)
+  assert.equal(f.requests.filter((r) => r.url.endsWith('/keys/create-import')).length, 1)
   assert.match(text(f.byKey('editor-error')), /新建结果尚未确认.*先刷新列表.*名称核实.*不要直接重复新建/)
   assert.match(text(f.byKey('key-notice')), /新建结果尚未确认/)
   assert.doesNotMatch(text(f.byKey('editor-error')), /请稍后重试|操作完成/)
@@ -425,14 +426,14 @@ test('a browser-side create deadline preserves the draft and requests name verif
 })
 
 test('server key-create-unconfirmed preserves the draft and requests name verification without resubmitting', async () => {
-  const f = await loaded((r) => r.url.endsWith('/keys/create') ? response({ ok: false, error: 'key-create-unconfirmed' }) : undefined)
+  const f = await loaded((r) => r.url.endsWith('/keys/create-import') ? response({ ok: false, error: 'key-create-unconfirmed' }) : undefined)
   f.click('create')
   f.name('fake-create-unconfirmed-draft')
   await f.submit()
   await tick()
-  const creates = f.requests.filter((r) => r.url.endsWith('/keys/create'))
+  const creates = f.requests.filter((r) => r.url.endsWith('/keys/create-import'))
   assert.equal(creates.length, 1)
-  assert.deepEqual(creates[0].body, { name: 'fake-create-unconfirmed-draft' })
+  assert.deepEqual(creates[0].body, { name: 'fake-create-unconfirmed-draft', autoModels: true })
   assert.match(text(f.byKey('editor-error')), /新建结果尚未确认.*先刷新列表.*名称核实.*不要直接重复新建/)
   assert.match(text(f.byKey('key-notice')), /新建结果尚未确认/)
   assert.doesNotMatch(text(f.byKey('editor-error')), /请稍后重试|操作完成/)
@@ -622,13 +623,13 @@ test('timed-out key requests show a usable error and release the busy lock', asy
   f.dispose()
 })
 
-for (const [kind, link, endpoint] of [['create', 'create', '/keys/create'], ['rename', 'rename', '/keys/update']]) {
+for (const [kind, link, endpoint] of [['create', 'create', '/keys/create-import'], ['rename', 'rename', '/keys/update']]) {
   test(`${kind} uses a controlled native-submit form with local validation, cancellation and no native dialogs`, async () => {
     const f = await loaded()
     f.click(link)
     assert.equal(f.byKey('key-editor').tag, 'form', 'Enter in the input submits this form natively')
     assert.equal(f.byKey('editor-submit').props.type, 'submit')
-    assert.equal(f.byKey('key-name').props.value, kind === 'rename' ? 'same-name' : '')
+    assert.equal(f.byKey('key-name').props.value, kind === 'rename' ? 'same-name' : 'DESKTOP-TEST')
     for (const value of ['   ', 'bad\nname', ...(kind === 'rename' ? ['same-name'] : [])]) {
       f.name(value); await f.submit()
       assert.equal(f.byKey('editor-error').props.role, 'alert')
@@ -640,9 +641,9 @@ for (const [kind, link, endpoint] of [['create', 'create', '/keys/create'], ['re
     assert.equal(f.find((n) => n.props.key === 'editor-error'), undefined)
     await f.submit()
     const sent = f.requests.find((r) => r.url.endsWith(endpoint))
-    assert.deepEqual(sent.body, kind === 'rename' ? { uuid: 'uuid-one', name: 'mock-new-name' } : { name: 'mock-new-name' })
+    assert.deepEqual(sent.body, kind === 'rename' ? { uuid: 'uuid-one', name: 'mock-new-name' } : { name: 'mock-new-name', autoModels: true })
     assert.equal(f.find((n) => n.props.key === 'key-editor'), undefined)
-    assert.match(text(f.byKey('key-notice')), /操作完成/)
+    assert.match(text(f.byKey('key-notice')), kind === 'create' ? /密钥已导入 DSH/ : /操作完成/)
     f.click(link); f.name('cancel-me'); f.click('editor-cancel')
     assert.equal(f.find((n) => n.props.key === 'key-editor'), undefined)
     f.click(link)
@@ -678,7 +679,7 @@ for (const [label, handler] of [
 for (const kind of ['create', 'rename', 'delete']) {
   test(`${kind} form deduplicates submits and blocks cancellation, edits and other mutations while pending`, async () => {
     const pending = deferred()
-    const endpoint = kind === 'create' ? '/keys/create' : kind === 'rename' ? '/keys/update' : '/keys/delete'
+    const endpoint = kind === 'create' ? '/keys/create-import' : kind === 'rename' ? '/keys/update' : '/keys/delete'
     const f = await loaded((r) => r.url.endsWith(endpoint) ? pending.promise : undefined)
     f.click(kind === 'delete' ? 'del' : kind)
     if (kind !== 'delete') f.name('mock-pending')
@@ -692,7 +693,7 @@ for (const kind of ['create', 'rename', 'delete']) {
     assert.equal(f.byKey('editor-submit').props.disabled, true)
     assert.equal(f.byKey('editor-cancel').props.disabled, true)
     f.click('editor-cancel'); f.click('create'); f.click('del'); f.click('import'); await f.click('models')
-    assert.equal(f.byKey('key-editor').props['aria-label'], kind === 'create' ? '新建密钥' : kind === 'rename' ? '重命名密钥' : '删除密钥')
+    assert.equal(f.byKey('key-editor').props['aria-label'], kind === 'create' ? '新建并导入' : kind === 'rename' ? '重命名密钥' : '删除密钥')
     assert.equal(picker(f), undefined)
     pending.resolve(response({ ok: true })); await Promise.all([one, two])
     assert.equal(f.find((n) => n.props.key === 'key-editor'), undefined)

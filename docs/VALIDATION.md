@@ -1,6 +1,6 @@
 # Windows 修复版验证记录
 
-日期：2026-11-07。版本：`1.0.5-windows.2`，基于上游 `1.0.4` / `90a6540a901f7a139727990833f12114cce7c14e`。
+日期：2026-11-07。版本：`1.0.5-windows.3`，基于上游 `1.0.4` / `90a6540a901f7a139727990833f12114cce7c14e`。
 
 ## 环境
 
@@ -13,7 +13,9 @@
 
 | 验证 | 结果 | 边界 |
 | --- | --- | --- |
-| `pnpm test` | 336 项：331 通过，0 失败，5 跳过 | 隔离 DSH_HOME / LOCALAPPDATA；约 33 秒 |
+| `pnpm test` | 351 项：346 通过，0 失败，5 跳过 | 隔离 DSH_HOME / LOCALAPPDATA |
+| 新建并导入（创建时一次性明文） | 通过（单元/路由/回环） | 明文只在宿主内；缺明文、无模型、凭据失败、并发、名称默认值均有回归 |
+| 真实创建协议探针 | **通过一次** | 2026-11-12：create 返回明文（25 字符）、verify 85 模型、按名称唯一识别、删除成功无残留 |
 | 已安装 Windows DSH SDK 契约 | 4/4 通过 | 真实 React/slot/Settings/credentials 模块，虚构密钥及临时存储 |
 | 临时 Unicode profile 的真实 pnpm 生命周期 | 通过 | 安装、verify、幂等重装、卸载、重复卸载；始终 `--no-task` |
 | Windows PowerShell 5.1 脚本语法与任务行为 | 通过 | ScheduledTasks cmdlet 设 mock/guard，未操作真实任务 |

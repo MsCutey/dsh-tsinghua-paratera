@@ -11,7 +11,7 @@ const SAFE_ERRORS = new Set([
   'console-session-missing', 'console-session-expired', 'console-api-error',
   'console-timeout', 'console-network-error', 'console-invalid-response',
   'keys-invalid-response', 'keys-pagination-stalled', 'keys-pagination-limit',
-  'key-create-unconfirmed', 'key-delete-unconfirmed', 'key-delete-not-deleted',
+  'key-create-unconfirmed', 'key-create-secret-missing', 'key-delete-unconfirmed', 'key-delete-not-deleted',
 ]);
 const safeError = (value, fallback) => SAFE_ERRORS.has(value) ? value
   : typeof value === 'string' && /^console-http-[45][0-9]{2}$/.test(value) ? value : fallback;

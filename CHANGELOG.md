@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.5-windows.3
+
+- 适配控制台 2026-11-12 的“密钥只显示一次”改版：列表不再提供“眼睛”，已有密钥无法再次读取。导入改为「新建并导入」，名称默认取本机设备名，可在表单中修改。
+- 新增宿主路由 `POST /api/keys/create-import` 与 `GET /api/keys/defaults`。创建响应的 `data` 为一次性明文字符串（官网 `showSecretKeyAfterCreate` 直接使用），明文只在宿主内流转，不返回前端、不写日志、不进进度快照。
+- 删除功能保留，继续做完整分页核验；结果未知时不自动重试。
+- HTTP 200 但缺少业务成功码、或创建成功却未返回明文时，分别给出 `key-create-unconfirmed` / `key-create-secret-missing`，并提示按名称核实或清理，不重复创建。
+- 新密钥没有可用模型时仍保存凭据并说明，不整体失败。
+- 新增真实回环 HTTP 新建/列表/删除测试、创建并导入单元与路由测试；修正测试服务器 DELETE 请求体与退出竞争。
+- 真实协议验证：创建返回明文（25 字符）、模型校验 85 个、按名称唯一识别、删除成功无残留。
+
 ## 1.0.5-windows.2
 
 - 修复密钥管理认证根因：官网通过打包别名导入 SparkMD5，`Ai-Authorization` 应为 `Bearer MD5(token)`，原插件误用 SHA-256。完整追踪并离线执行官方 UI/action/HTTP 调用链对照，保留正确的 POST/DELETE JSON 契约。

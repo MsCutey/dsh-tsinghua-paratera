@@ -72,9 +72,12 @@ test('key mutations use expected endpoint, body and UUID with mock transport onl
   const requests = [];
   mock.method(globalThis, 'fetch', async (url, options) => {
     requests.push([new URL(url).pathname, options.method, JSON.parse(options.body)]);
-    return new Response(JSON.stringify({ code: 200, data: url.endsWith('/llmSk') ? { rows: [], total: 0 } : null }));
+    const data = url.endsWith('/llmSk') ? { rows: [], total: 0 }
+      : url.endsWith('/create') ? 'sk-FAKE-CREATED-SECRET-0123456789' : null;
+    return new Response(JSON.stringify({ code: 200, data }));
   });
-  for (const operation of [() => createKey(' test '), () => renameKey('uuid', ' renamed '), () => setKeyStatus('uuid', 'invalid'), () => deleteKey('uuid'), () => refreshSupportedModels()]) {
+  assert.deepEqual(await createKey(' test '), { ok: true, secret: 'sk-FAKE-CREATED-SECRET-0123456789' });
+  for (const operation of [() => renameKey('uuid', ' renamed '), () => setKeyStatus('uuid', 'invalid'), () => deleteKey('uuid'), () => refreshSupportedModels()]) {
     assert.deepEqual(await operation(), { ok: true });
   }
   assert.deepEqual(requests, [

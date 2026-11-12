@@ -1,6 +1,6 @@
 {
   "name": "dsh-tsinghua-paratera",
-  "version": "1.0.5-windows.2",
+  "version": "1.0.5-windows.3",
   "scripts": {
     "test": "node scripts/run-tests.mjs",
     "install:dsh": "node scripts/install.mjs",
