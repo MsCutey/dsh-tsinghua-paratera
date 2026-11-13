@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.6-windows.2
+
+- 与宿主解耦加固，详见 [耦合评估](docs/HOST-COUPLING.md)。
+- 鉴权边界改为 fail-closed：优先使用文档化的 `connection.admit()`，回退到仍存在的 `requestRejection()`；两者缺失、抛错或返回畸形结果时返回 503，不再可能静默放行未认证请求。
+- 输入栏余额的四项注入经真实宿主验证为**传递依赖**：只保留 `modelDirectories` 会让标记消失，恢复 `sessions`/`remote`/`remote.session` 后通过；已记录在档，避免后续误删。
+- `package.json` 声明 `engines.dsh: ">=0.2.1-rc.5 <0.3.0"`，DSH 升级到不兼容版本时由宿主给出明确提示。
+- 诊断接口新增 `contract` 字段，报告实际发现的鉴权方法、凭据/设置/模型目录方法是否齐全，便于升级后定位失效点。
+- 新增 `tests/host-contract.test.mjs` 覆盖无鉴权方法、异常与畸形 admission、`admit` 优先、兼容回退与诊断字段。
+
 ## 1.0.6-windows.1
 
 - 恢复并完成模型筛选：创建设备密钥 → 默认空选的搜索/筛选列表 → 导入所选模型；不再自动导入全部模型。候选不在200项截断，只限制最多选择200项；保留「仅保存密钥」。

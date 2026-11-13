@@ -3,7 +3,7 @@
 DeepSeek Harness（DSH）的非官方插件，打通**清华大学统一身份认证**与 **Paratera** 算力：
 登录与续期、算力券余额、控制台 API 密钥、模型导入与模型参数设置。支持 **macOS / Windows**。
 
-当前修复版：**1.0.6-windows.1**（基于上游 **1.0.4**，保留相同功能线）。本项目不隶属于清华大学、Paratera 或 DeepSeek。
+当前修复版：**1.0.6-windows.2**（基于上游 **1.0.4**，保留相同功能线）。本项目不隶属于清华大学、Paratera 或 DeepSeek。
 
 Windows 安装、完整卸载、删除修复的实际边界与验证范围，见 [Windows 指南](docs/WINDOWS.md)。这是独立源码修复版，未自动安装或发布到上游。
 
@@ -96,6 +96,10 @@ Windows 使用安装目录中 `resources\runtime\primary-runtime\dependencies\no
 - 创建密钥不等于购买订阅，后续模型调用仍受平台计费规则约束。
 
 平台模型广场和公开目录用于生成推荐值，不能保证每个路由实际支持声明的上限；请按目标模型验证。
+
+## 宿主兼容
+
+插件不 import DSH 代码，只通过宿主注入的服务与前端的模块/插槽协议通信。公开契约、未文档化接口和内部假设已分级记录在 [与 DSH 的耦合评估](docs/HOST-COUPLING.md)，包含 `engines.dsh` 兼容范围、升级后的自查顺序和诊断页 `contract` 字段说明。
 
 ## 可选后台续期
 
