@@ -323,7 +323,7 @@ test('same credential does not replace the previous backup', async () => {
   f.stored.set(REF, SECRET);
   f.stored.set(`${REF}_BACKUP`, PREVIOUS);
   assert.equal((await importKey({ uuid: 'uuid-1' }, f.dependencies)).ok, true);
-  assert.deepEqual(f.writes, [REF]);
+  assert.deepEqual(f.writes, []); // Read-back already proves the same credential; no redundant write.
   assert.equal(f.stored.get(`${REF}_BACKUP`), PREVIOUS);
 });
 

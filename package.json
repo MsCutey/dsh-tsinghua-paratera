@@ -1,6 +1,6 @@
 {
   "name": "dsh-tsinghua-paratera",
-  "version": "1.0.5-windows.3",
+  "version": "1.0.6-windows.1",
   "scripts": {
     "test": "node scripts/run-tests.mjs",
     "install:dsh": "node scripts/install.mjs",
@@ -28,6 +28,7 @@
   },
   "files": [
     "lib",
+    "!lib/reveal.mjs",
     "scripts/install.mjs",
     "scripts/windows.ps1",
     "scripts/verify-key-lifecycle.mjs",

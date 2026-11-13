@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { importKey } from '../lib/import.mjs';
+import { importPreparedKey, fingerprint } from '../lib/import.mjs';
 import vm from 'node:vm';
 import { browserSdk } from './browser-sdk.mjs';
 
@@ -293,13 +293,11 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
         },
       } },
     });
-    const dependencies = {
-      credentials, settings, llm,
-      list: async () => ({ ok: true, keys: [{ uuid: 'mock-uuid', name: 'mock-key', status: 'valid' }] }),
-      reveal: async () => ({ ok: true, secret: SECRET }),
-      verify: async () => ({ ok: true, models: 2, modelIds: [MODEL, SECOND_MODEL] }),
-    };
-    const first = await importKey({ uuid: 'mock-uuid', models: [MODEL] }, dependencies);
+    // The current workflow imports a freshly-created host-only secret only
+    // after an explicit selection. No obsolete eye/reveal dependency is used.
+    const dependencies = { credentials, settings, llm };
+    const prepared = { name: 'TEST-LAPTOP', secret: SECRET, fingerprint: fingerprint(SECRET), offered: [MODEL, SECOND_MODEL], verifiedModels: 2 };
+    const first = await importPreparedKey({ ...prepared, models: [MODEL] }, dependencies);
     assert.equal(first.ok, true);
     assert.equal(first.credentialImported, true);
     assert.equal(first.modelConfigUpdated, true);
@@ -319,7 +317,7 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
 
     // Add a second model without booting another adapter. Route-registration
     // facts do not change, so this also catches stale adapter profile snapshots.
-    const second = await importKey({ uuid: 'mock-uuid', models: [SECOND_MODEL] }, dependencies);
+    const second = await importPreparedKey({ ...prepared, models: [SECOND_MODEL] }, dependencies);
     assert.equal(second.ok, true);
     assert.equal(second.providerRegistered, true);
     assert.equal(second.modelsAvailable, true);
@@ -336,7 +334,7 @@ test('installed SDK imports and hot-updates models on the same adapter and volat
     assert.deepEqual((await llm.listModels('other')).map((model) => model.id), ['untouched']);
 
     // Idempotent import verifies the real directory even with no settings edit.
-    const repeated = await importKey({ uuid: 'mock-uuid', models: [SECOND_MODEL] }, dependencies);
+    const repeated = await importPreparedKey({ ...prepared, models: [SECOND_MODEL] }, dependencies);
     assert.equal(repeated.ok, true);
     assert.equal(repeated.modelConfigUpdated, false);
     assert.equal(repeated.providerRegistered, true);

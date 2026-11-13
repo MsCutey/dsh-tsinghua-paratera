@@ -24,7 +24,7 @@ function main() {
     : path.join(path.dirname(executable), 'resources');
   const sdk = values['--sdk-root'] || path.join(resources, 'app.asar', 'dsh', 'node_modules');
   if (!values['--sdk-root'] && !fs.existsSync(path.join(resources, 'app.asar'))) throw Error('installed DSH app.asar was not found; specify --sdk-root if needed');
-  const result = spawnSync(executable, ['--test', '--test-force-exit', fileURLToPath(new URL('../tests/host-sdk.test.mjs', import.meta.url))], {
+  const result = spawnSync(executable, ['--test', '--test-force-exit', ...['host-sdk.test.mjs', 'settings-dom.test.mjs'].map((name) => fileURLToPath(new URL('../tests/' + name, import.meta.url)))], {
     stdio: 'inherit', windowsHide: true,
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_SDK_NODE_MODULES: sdk },
   });

@@ -2,7 +2,7 @@
 
 ## 版本与范围
 
-- 修复版：`1.0.5-windows.3`，基于上游 `1.0.4` / commit `90a6540a901f7a139727990833f12114cce7c14e`。
+- 当前开发版：`1.0.6-windows.1`，基于上游 `1.0.4` 及 Windows 修复线；新增完整三步模型筛选导入。
 - 保留余额、登录、二次认证、密钥管理、模型导入和模型设置功能；没有改动 DSH 安装包，也没有自动安装到开发者正在使用的 profile。
 - Windows 10/11、Node.js 22+、Google Chrome；已安装且初始化过 DSH desktop profile。
 - 这是可测试的源码/插件修复包，不是 DSH 的 Windows EXE 安装器，也未代替上游公开发布。
@@ -32,6 +32,18 @@ $env:DSH_PNPM = 'D:\your-runtime\pnpm\bin\pnpm.mjs'
 
 同时支持原有 Node 命令。Windows 安装器优先使用 DSH 的 `pnpm.mjs` / `pnpm.cjs`，也能解析常见全局 npm pnpm.cmd 对应的 JS 入口；不会把路径和参数拼成 cmd.exe 命令。只有无法解析的自定义 shim 时，需要显式设置 `DSH_PNPM`。
 
+## 创建并筛选模型
+
+连接控制台后，使用「创建设备密钥」：名称默认当前设备名，可编辑。创建并校验完成后会进入**模型选择**，不是自动添加全部模型。
+
+- 输入搜索词，只对当前筛选结果全选/取消；默认空选，最多200个，可搜索全部候选。
+- 选择「导入所选模型」保存密钥并追加选中项，或明确选择「仅保存密钥」。
+- 页面刷新可以恢复未完成步骤；一次性密钥最长只在宿主内存保留10分钟。请完成后再重启 DSH。
+- 取消需要再次确认；只有确认是本次新建 UUID 才删除，已有同名密钥不受影响。
+- 已导入密钥后模型失败，只需处理模型配置/在有效期内重试同一操作，不重新创建设备密钥。
+
+列表不再展示已失效的眼睛导入。详见 [流程与安全边界](KEY-MANAGEMENT.md)。
+
 ## 密钥与密码删除
 
 这两类操作不同：
@@ -41,7 +53,7 @@ $env:DSH_PNPM = 'D:\your-runtime\pnpm\bin\pnpm.mjs'
 
 ### 不能由客户端保证的边界
 
-2026-11-07 的完整调用链核对发现：原插件认证头误用 SHA-256，而官网使用 SparkMD5/MD5。`1.0.5-windows.3` 已修正为 `Bearer MD5(token)`，用户授权后真实新建→删除验收通过。DELETE 方法及 `{tokenUuid}` JSON 参数保持不变。根因证据、真实验收与复验入口见 [密钥管理修复记录](KEY-MANAGEMENT.md)。公开来源：
+2026-11-07 的完整调用链核对发现：原插件认证头误用 SHA-256，而官网使用 SparkMD5/MD5。`1.0.5-windows.2` 已修正为 `Bearer MD5(token)`，用户授权后真实新建→删除验收通过。DELETE 方法及 `{tokenUuid}` JSON 参数保持不变。根因证据、真实验收与复验入口见 [密钥管理修复记录](KEY-MANAGEMENT.md)。公开来源：
 
 - [平台入口](https://ai.paratera.com/)
 - [API 密钥页面脚本](https://ai.paratera.com/assets/js/index-CLU5W59i.js)
